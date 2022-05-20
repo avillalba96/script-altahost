@@ -7,7 +7,7 @@ Script para dar alta hosts armado en nuestra necesidades
 ## **Instalación** 🔧
 
 ```bash
-git clone https://github.com/avillalba96/script-altacertificadovpn.git && cd "$(basename "$_" .git)" && cd install && ./alta.lunixstart.sh
+git clone https://github.com/avillalba96/script-altahost && cd "$(basename "$_" .git)" && cd install && ./alta.lunixstart.sh
 ```
 
 ### **Autores** ✒️
