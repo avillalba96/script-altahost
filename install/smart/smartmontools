@@ -1,0 +1,1 @@
+DEVICESCAN -H -l error -l selftest -f -s (O/../../5/11|L/../../5/13|C/../../5/15) -m EMAILC -M exec /usr/share/smartmontools/smartd-runner

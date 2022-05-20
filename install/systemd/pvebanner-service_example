@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+
+use strict;
+use PVE::INotify;
+use PVE::Cluster;
+
+my $nodename = PVE::INotify::nodename();
+my $localip = PVE::Cluster::remote_node_ip($nodename, 1);
+my $pveversion = join('',split(/\n/,qx(pveversion | awk -F"[/ /]+" "{print \\\$2}")));
+
+my $xline = '-' x 78;
+
+my $banner = '';
+
+if ($localip) {
+    $banner .= <<__EOBANNER;
+
+\e[1;31m
+ -----------------------------------------------------
+               #####  PROXMOX v${pveversion} #####
+               ## ALTA: FECHA_ALTA ##
+\e[1;32m
+                ${nodename}.DOMINIO
+LOCAL: 	    https://${localip}:8006/
+ -----------------------------------------------------
+\e[0m
+
+__EOBANNER
+
+}
+
+open(ISSUE, ">/etc/issue");
+
+print ISSUE $banner;
+
+close(ISSUE);
+
+open(ISSUE, ">/etc/motd");
+
+print ISSUE $banner;
+
+close(ISSUE);
+
+exit (0);

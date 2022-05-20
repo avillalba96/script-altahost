@@ -1,0 +1,10 @@
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION main restricted
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION-updates main restricted
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION universe
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION-updates universe
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION multiverse
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION-updates multiverse
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION-backports main restricted universe multiverse
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION-security main restricted
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION-security universe
+deb http://ar.archive.ubuntu.com/ubuntu SO_VERSION-security multiverse

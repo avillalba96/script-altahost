@@ -1,0 +1,27 @@
+#################### 
+# sanoid.conf file # 
+####################
+
+[rpool/data]
+        use_template = proxbase
+        recursive = yes
+        process_children_only = yes
+
+############################# 
+# templates below this line # 
+#############################
+
+[template_proxbase]
+        frequently = 0
+        # Snapshots cada 1 hora
+        hourly = 6
+        # Snapshots diarios
+        daily = 7
+        # Snapshots mensuales
+        monthly = 0
+        # Snapshots anuales
+        yearly = 0
+        # create new snapshots 
+        autosnap = yes
+        # clean old snapshot 
+        autoprune = yes

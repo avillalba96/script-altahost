@@ -1,0 +1,13 @@
+[Unit]
+Description=Loading new kernel into memory
+Documentation=man:kexec(8)
+DefaultDependencies=no
+Before=reboot.target
+RequiresMountsFor=/boot
+#Before=shutdown.target umount.target final.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/kexec -d -l /boot/pve/vmlinuz --initrd=/boot/pve/initrd.img --reuse-cmdline
+[Install]
+WantedBy=default.target

@@ -1,0 +1,9 @@
+postmaster: root
+nobody: root
+hostmaster: root
+webmaster: root
+www: root
+
+##
+root: useremail
+useremail: EMAILC
