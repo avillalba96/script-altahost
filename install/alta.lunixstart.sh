@@ -488,8 +488,8 @@ init_script() {
     --form "Completar datos personales de la empresa SRL:" 25 60 16 \
     "Correo de la empresa: " 1 1 "ing@example.com.ar" 1 32 25 30 \
     "Sitio web de la empresa: " 2 1 "www.example.com.ar" 2 32 25 30 \
-    "IP RELAYHOST (Postfix): " 3 1 "172.26.0.1" 2 32 25 30 \
-    "IP ZABBIX-PROXY (ignorar si no se usa): " 4 1 "172.24.0.1" 2 32 25 30 >/tmp/out2.tmp \
+    "IP RELAYHOST (Postfix): " 3 1 "172.26.0.1" 3 32 25 30 \
+    "IP ZABBIX-PROXY (ignorar si no se usa): " 4 1 "172.24.0.1" 4 32 25 30 >/tmp/out2.tmp \
     2>&1 >/dev/tty
 
   CORREO=$(sed -n 1p /tmp/out2.tmp)

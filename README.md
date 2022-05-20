@@ -7,6 +7,7 @@ Script para dar alta hosts armado en nuestra necesidades
 ## **Instalación** 🔧
 
 ```bash
+apt-get update; apt-get install -y git
 git clone https://github.com/avillalba96/script-altahost && cd "$(basename "$_" .git)" && cd install && ./alta.lunixstart.sh
 ```
 
