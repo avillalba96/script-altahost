@@ -373,8 +373,7 @@ install_server_proxmox() {
   cmd=(dialog --separate-output --checklist "Seleccionar paquetes a instalar:" 22 76 16)
   Opcions=(1 "Proxmox - AMDFIXES" off
     2 "Proxmox - KEXEC" off
-    3 "Proxmox - KSMTUNED" off
-    4 "Proxmox - LDAP" off)
+    3 "Proxmox - KSMTUNED" off)
   choices=$("${cmd[@]}" "${Opcions[@]}" 2>&1 >/dev/tty)
   clear
   for choice in $choices; do
@@ -387,9 +386,6 @@ install_server_proxmox() {
       ;;
     3)
       KSMTUNED=1
-      ;;
-    4)
-      LDAP=1
       ;;
     esac
   done
@@ -674,7 +670,6 @@ main() {
     AMDFIXES=0
     KEXEC=0
     KSMTUNED=0
-    LDAP=0
     MOTDON=0
 
     # Iniciando instalacion
