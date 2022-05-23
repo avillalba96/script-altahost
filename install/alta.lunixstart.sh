@@ -72,6 +72,14 @@ install_borg() {
 
 install_zabbix_basic() {
   if [[ $ZABBIXON -eq 1 ]]; then
+    # Ingresando dato del Zabbix Proxy
+    dialog --clear \
+      --form "Escribir Zabbix-Proxy:" 25 60 16 \
+      "Zabbix-Proxy: " 1 1 "172.24.0.1" 1 32 25 30 >/tmp/out3.tmp \
+      2>&1 >/dev/tty
+
+    IPZABBIX=$(sed -n 1p /tmp/out3.tmp)
+    rm -f /tmp/out3.tmp
 
     VERSIONID=$(cat /etc/*release | grep "VERSION_ID" | awk -F'[" ]+' '{print $2}')
     DEBIANVERSION_ZABBIX=$(grep "ID=" /etc/*release | awk -F'[= ]+' '{print $2}' | grep -ci "debian")
@@ -484,14 +492,12 @@ init_script() {
     --form "Completar datos personales de la empresa SRL:" 25 60 16 \
     "Correo de la empresa: " 1 1 "ing@example.com.ar" 1 32 25 30 \
     "Sitio web de la empresa: " 2 1 "www.example.com.ar" 2 32 25 30 \
-    "Relayhost (Postfix): " 3 1 "172.26.0.1" 3 32 25 30 \
-    "Zabbix-Proxy (ignorar si no se usa): " 4 1 "172.24.0.1" 4 37 25 30 >/tmp/out2.tmp \
+    "Relayhost (Postfix): " 3 1 "172.26.0.1" 3 32 25 30 >/tmp/out2.tmp \
     2>&1 >/dev/tty
 
   CORREO=$(sed -n 1p /tmp/out2.tmp)
   SITIO=$(sed -n 2p /tmp/out2.tmp)
   IPCORREO=$(sed -n 3p /tmp/out2.tmp)
-  IPZABBIX=$(sed -n 4p /tmp/out2.tmp)
   rm -f /tmp/out2.tmp
 
   # Intentamos obtener la IP principal

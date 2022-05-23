@@ -13,9 +13,10 @@ git clone https://github.com/avillalba96/script-altahost && cd "$(basename "$_" 
 
 ### **Autores** ✒️
 
-* **Pablo Ramos** - *Trabajo Inicial* - [Pablo Ramos](https://git.lunix.com.ar/pramos)
-* **Maximiliano Baez** - *Colaboracion* - [Maximiliano Baez](https://github.com/MaximilianoBz)
-* **Alejandro Villalba** - *Colaboracion* - [Alejandro Villalba](https://github.com/avillalba96)
+* **Maxi** - [Maximiliano Baez](https://github.com/MaximilianoBz)
+* **Franco** - [Franco Grismado](https://github.com/fgrismado)
+* **Pablop** - [Pablo Ramos](https://github.com/avillalba96)
+* **Alejandro** - [Alejandro Villalba](https://github.com/avillalba96)
 
 ### **Cosas por hacer** 📦
 
