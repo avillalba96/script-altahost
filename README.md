@@ -1,8 +1,8 @@
 # **script-altahost**
 
-Script para dar alta hosts armado en nuestra necesidades
+Script para dar alta a UBUNTU/DEBIAN/PVE/PBS en base a necesidad de Lunix SRL
 
-***Verificado en: Debian9+ / Ubuntu18+***
+***Verificado en: Debian9+ / Ubuntu18+ / PVE6+***
 
 ## **Instalación** 🔧
 
