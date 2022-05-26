@@ -155,12 +155,14 @@ install_client_vpn() {
 install_docker() {
   # Instalamos docker
   apt-get update
-  apt-get install apt-transport-https ca-certificates curl gnupg-agent software-properties-common -y
+  apt-get install apt-transport-https ca-certificates curl gnupg-agent software-properties-common lsb-release -y
 
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-  apt-key fingerprint 0EBFCD88
+  mkdir -p /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
-  add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 
   apt-get update
   apt-get install docker-ce docker-ce-cli containerd.io -y
@@ -482,7 +484,7 @@ init_script() {
     "Nombre del equipo (sin dominio): " 1 1 "host" 1 32 25 30 \
     "Dominio del equipo: " 2 1 "cliente.com" 2 32 25 30 \
     "Envio de email: " 3 1 "ing@example.com.ar" 3 32 25 30 \
-    "Relayhost (Postfix): " 4 1 "172.26.0.1" 4 32 25 30 > /tmp/out.tmp \
+    "Relayhost (Postfix): " 4 1 "172.26.0.1" 4 32 25 30 >/tmp/out.tmp \
     2>&1 >/dev/tty
 
   HOST=$(sed -n 1p /tmp/out.tmp)
