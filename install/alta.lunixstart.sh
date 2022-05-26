@@ -91,7 +91,7 @@ install_zabbix_basic() {
     fi
 
     dpkg -i zabbix-release_*
-    apt update
+    apt-get update
     aptitude install -y zabbix-agent
     sed -i s/ZABBIXIP/"$IPZABBIX"/g zabbix/zabbix_agentd.conf
     sed s/nuevo.host/"$HOST"."$DOMINIO"/g zabbix/zabbix_agentd.conf >/etc/zabbix/zabbix_agentd.conf
@@ -124,7 +124,7 @@ install_motd() {
     chmod +x /usr/bin/pvebanner
     systemctl restart pvebanner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-    sed -i "s/www.proxmox.com/$SITIO/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
     cp images/proxmox_logo.png /usr/share/pve-manager/images/.
 
   elif [[ $PROXMOX_BACKUP_YES -eq 1 ]]; then
@@ -135,7 +135,7 @@ install_motd() {
     chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     systemctl restart proxmox-backup-banner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-    sed -i "s/www.proxmox.com/$SITIO/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
     cp images/proxmox_logo.png /usr/share/javascript/proxmox-backup/images/.
 
   else
@@ -348,13 +348,13 @@ config_raid_zfs() {
 
   # Instalar sanoid para snaps de mv (Esto causa un incremento en IO-Delay)
   if (whiptail --title "" --yesno "Desea instalar SANOID?" 10 60); then
-    apt install debhelper libcapture-tiny-perl libconfig-inifiles-perl pv lzop mbuffer build-essential git -y
+    apt-get install debhelper libcapture-tiny-perl libconfig-inifiles-perl pv lzop mbuffer build-essential git -y
     git clone https://github.com/jimsalterjrs/sanoid.git
     cd sanoid || exit
     git checkout $(git tag | grep "^v" | tail -n 1)
     ln -s packages/debian .
     dpkg-buildpackage -uc -us
-    apt install ../sanoid_*_all.deb
+    apt-get install ../sanoid_*_all.deb
     cd ..
     cp sanoidcfg/sanoid.conf_template /etc/sanoid/sanoid.conf
 
@@ -442,7 +442,7 @@ install_vm() {
 
 finish_script() {
   sysctl --system
-  apt autoremove && apt autoclean
+  apt-get autoremove && apt-get autoclean
 
   cd "$DIRALTA" || return
   cd ..
@@ -480,25 +480,16 @@ init_script() {
   dialog --clear \
     --form "Completar datos del equipo cliente:" 25 60 16 \
     "Nombre del equipo (sin dominio): " 1 1 "host" 1 32 25 30 \
-    "Dominio del equipo: " 2 1 "cliente.com" 2 32 25 30 >/tmp/out.tmp \
+    "Dominio del equipo: " 2 1 "cliente.com" 2 32 25 30 \
+    "Envio de email: " 3 1 "ing@example.com.ar" 3 32 25 30 \
+    "Relayhost (Postfix): " 4 1 "172.26.0.1" 4 32 25 30 > /tmp/out.tmp \
     2>&1 >/dev/tty
 
   HOST=$(sed -n 1p /tmp/out.tmp)
   DOMINIO=$(sed -n 2p /tmp/out.tmp)
+  CORREO=$(sed -n 3p /tmp/out.tmp)
+  IPCORREO=$(sed -n 4p /tmp/out.tmp)
   rm -f /tmp/out.tmp
-
-  # Ingresando datos personales de la empresa
-  dialog --clear \
-    --form "Completar datos personales de la empresa SRL:" 25 60 16 \
-    "Correo de la empresa: " 1 1 "ing@example.com.ar" 1 32 25 30 \
-    "Sitio web de la empresa: " 2 1 "www.example.com.ar" 2 32 25 30 \
-    "Relayhost (Postfix): " 3 1 "172.26.0.1" 3 32 25 30 >/tmp/out2.tmp \
-    2>&1 >/dev/tty
-
-  CORREO=$(sed -n 1p /tmp/out2.tmp)
-  SITIO=$(sed -n 2p /tmp/out2.tmp)
-  IPCORREO=$(sed -n 3p /tmp/out2.tmp)
-  rm -f /tmp/out2.tmp
 
   # Intentamos obtener la IP principal
   IP=$(ip a | grep inet | grep -v inet6 | grep -v 127.0.0.1 | head -n1 | awk -F'[/ ]+' '{print $3}')
@@ -578,7 +569,7 @@ select_package_init() {
   cmd=(dialog --separate-output --checklist "Seleccionar paquetes a instalar:" 22 76 16)
   Opcions=(1 "Client - VPN (pfSense)" off
     2 "Client - ZABBIX (6.0)" off
-    3 "Client - BORG" off
+    3 "Client - BORG (Lunix SRL)" off
     4 "Client - BANNER (Lunix SRL)" off)
   choices=$("${cmd[@]}" "${Opcions[@]}" 2>&1 >/dev/tty)
   clear
@@ -639,7 +630,7 @@ prepare_system() {
   sysctl --system
 
   # Instalamos el paquete necesario para tener el menu de instalacion
-  apt update && apt upgrade -y
+  apt-get update && apt-get upgrade -y
   apt-get install -y dialog wget curl
 
   if (whiptail --title "" --yesno "Verificar tener salida irrestricta a Internet. Presione YES para continuar." 10 60); then

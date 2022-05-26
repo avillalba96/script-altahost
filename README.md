@@ -2,7 +2,19 @@
 
 Script para dar alta a UBUNTU/DEBIAN/PVE/PBS en base a necesidad de Lunix SRL
 
-***Verificado en: Debian9+ / Ubuntu18+ / PVE6+***
+**Verificado en:**
+
+```bash
+Debian9
+Debian10
+Debian11
+Ubuntu20.04
+Ubuntu22.04
+PVE v6+
+PVE v7+
+PBS v1+
+PBS v2+
+```
 
 ## **Instalación** 🔧
 
@@ -15,7 +27,7 @@ git clone https://github.com/avillalba96/script-altahost && cd "$(basename "$_" 
 
 * **Maxi** - [Maximiliano Baez](https://github.com/MaximilianoBz)
 * **Franco** - [Franco Grismado](https://github.com/fgrismado)
-* **Pablop** - [Pablo Ramos](https://github.com/avillalba96)
+* **Pablito** - [Pablo Ramos](https://github.com/avillalba96)
 * **Alejandro** - [Alejandro Villalba](https://github.com/avillalba96)
 
 ### **Cosas por hacer** 📦

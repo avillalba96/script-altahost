@@ -35,7 +35,7 @@ function update_container() {
   clear
   header_info
   echo -e "${BL}[Info]${GN} Updating${BL} $container ${CL} \n"
-  pct exec $container -- bash -c "apt update && apt upgrade -y && apt autoremove -y"
+  pct exec $container -- bash -c "apt-get update && apt-get upgrade -y && apt-get autoremove -y"
 }
 read -p "Skip stopped containers? " -n 1 -r
 echo
