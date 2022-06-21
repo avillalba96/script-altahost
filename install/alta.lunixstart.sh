@@ -240,7 +240,7 @@ config_raid_megacli() {
   echo ""
   echo -e "\e[0;31m###########################################################\e[0m"
   echo -e "\e[0;31m# NOTA: Este script considera un solo disco, /dev/sda     #\e[0m"
-  echo -e "\e[0;31m# De ser necesario editar opt_megacli                     #\e[0m"
+  echo -e "\e[0;31m# De ser necesario editar config_raid_megacli             #\e[0m"
   echo -e "\e[0;31m###########################################################\e[0m"
   echo ""
   sleep 3
@@ -277,7 +277,7 @@ config_raid_zfs() {
   echo ""
   echo -e "\e[0;31m################################################\e[0m"
   echo -e "\e[0;31m# NOTA: Este script considera un solo rpool    #\e[0m"
-  echo -e "\e[0;31m# De ser necesario editar opt_zfs              #\e[0m"
+  echo -e "\e[0;31m# De ser necesario editar config_raid_zfs      #\e[0m"
   echo -e "\e[0;31m################################################\e[0m"
   echo ""
   sleep 3
