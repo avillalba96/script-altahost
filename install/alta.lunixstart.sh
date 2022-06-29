@@ -81,16 +81,11 @@ install_zabbix_basic() {
     IPZABBIX=$(sed -n 1p /tmp/out3.tmp)
     rm -f /tmp/out3.tmp
 
-    VERSIONID=$(cat /etc/*release | grep "VERSION_ID" | awk -F'[" ]+' '{print $2}')
-    DEBIANVERSION_ZABBIX=$(grep "ID=" /etc/*release | awk -F'[= ]+' '{print $2}' | grep -ci "debian")
+    ZABBIXURL="https://repo.zabbix.com/zabbix/6.0/$(lsb_release -is | sed 's/[A-Z]/\L&/g')/pool/main/z/zabbix-release/"
+    ZABBIXVERSION="zabbix-release_6.0-3+$(lsb_release -is | sed 's/[A-Z]/\L&/g')"
+    wget $ZABBIXURL"$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
 
-    if [[ ("$DEBIANVERSION_ZABBIX" == 1) ]]; then
-      wget --no-check-certificate https://repo.zabbix.com/zabbix/6.0/debian/pool/main/z/zabbix-release/zabbix-release_6.0-1%2Bdebian"$VERSIONID"_all.deb
-    else
-      wget --no-check-certificate https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.0-2%2Bubuntu"$VERSIONID"_all.deb
-    fi
-
-    dpkg -i zabbix-release_*
+    dpkg -i "$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
     apt-get update
     aptitude install -y zabbix-agent
     sed -i s/ZABBIXIP/"$IPZABBIX"/g zabbix/zabbix_agentd.conf
@@ -434,7 +429,7 @@ install_vm() {
   done
 
   # Docker para Ubuntu
-  INSTALLDOCKER=$(grep "PRETTY_NAME" /etc/*release | awk -F'[=]+' '{print $2}' | grep -ci "ubuntu" 2>/dev/null)
+  INSTALLDOCKER=$(lsb_release -is | grep -ci "ubuntu" 2>/dev/null)
   if [[ $INSTALLDOCKER -eq 1 ]]; then
     if (whiptail --title "" --yesno "Desea instalar DOCKER?" 10 60); then
       install_docker
@@ -474,8 +469,8 @@ init_script() {
   FECHA="$(date -I)"
 
   # Actualizamos los apt para la version de debian correspondiente
-  NAMEHOST=$(grep "PRETTY_NAME" /etc/*release | awk -F'[=]+' '{print $2}')
-  VERSIONSO=$(grep "VERSION_CODENAME" /etc/*release | awk -F'[= ]+' '{print $2}' | sed -e 's/(//g' | sed -e 's/)"//g' | awk '{print tolower($0)}')
+  NAMEHOST=$(lsb_release -ds)
+  VERSIONSO=$(lsb_release -cs)
   grep -rl SO_VERSION apt/. | xargs sed -i "s/SO_VERSION/${VERSIONSO}/g" 2>/dev/null
 
   # Ingresando datos del equipo
@@ -636,8 +631,8 @@ prepare_system() {
   apt-get install -y dialog wget curl
 
   if (whiptail --title "" --yesno "Verificar tener salida irrestricta a Internet. Presione YES para continuar." 10 60); then
-    DEBIANVERSION_YES=$(grep "ID=" /etc/*release | awk -F'[= ]+' '{print $2}' | grep -ci "debian")
-    UBUNTUVERSION_YES=$(grep "ID=" /etc/*release | awk -F'[= ]+' '{print $2}' | grep -ci "ubuntu")
+    DEBIANVERSION_YES=$(lsb_release -is | grep -ci "debian")
+    UBUNTUVERSION_YES=$(lsb_release -is | grep -ci "ubuntu")
 
     if [[ ("$DEBIANVERSION_YES" == 0) && ("$UBUNTUVERSION_YES" == 0) ]]; then
       rm /etc/lunix/alta_lunix
