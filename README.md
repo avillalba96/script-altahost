@@ -5,15 +5,10 @@ Script para dar alta a UBUNTU/DEBIAN/PVE/PBS en base a necesidad de Lunix SRL
 **Verificado en:**
 
 ```bash
-Debian9
-Debian10
-Debian11
-Ubuntu20.04
-Ubuntu22.04
+Cloud/Debian9+
+Cloud/Ubuntu20.04+
 PVE v6+
-PVE v7+
 PBS v1+
-PBS v2+
 ```
 
 ## **Instalación** 🔧
@@ -32,7 +27,6 @@ git clone https://github.com/avillalba96/script-altahost && cd "$(basename "$_" 
 
 ### **Cosas por hacer** 📦
 
-0. **NO ESTA VERIFICADO:** PBS / aliases(envio de correo)
 1. Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
 
 ```bash

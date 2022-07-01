@@ -83,7 +83,7 @@ install_zabbix_basic() {
 
     ZABBIXURL="https://repo.zabbix.com/zabbix/6.0/$(lsb_release -is | sed 's/[A-Z]/\L&/g')/pool/main/z/zabbix-release/"
     ZABBIXVERSION="zabbix-release_6.0-3+$(lsb_release -is | sed 's/[A-Z]/\L&/g')"
-    wget $ZABBIXURL"$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
+    wget "$ZABBIXURL""$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
 
     dpkg -i "$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
     apt-get update
@@ -161,7 +161,8 @@ install_docker() {
 
   apt-get update
   apt-get install docker-ce docker-ce-cli containerd.io -y
-  curl -L "https://github.com/docker/compose/releases/download/v2.6.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  COMPOSEVERSION="2.6.0"
+  curl -L "https://github.com/docker/compose/releases/download/v$COMPOSEVERSION/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
   chmod +x /usr/local/bin/docker-compose
 
   cp docker/daemon.json /etc/docker/daemon.json
@@ -474,18 +475,17 @@ init_script() {
   grep -rl SO_VERSION apt/. | xargs sed -i "s/SO_VERSION/${VERSIONSO}/g" 2>/dev/null
 
   # Ingresando datos del equipo
+  HOST=$(hostname)
   dialog --clear \
     --form "Completar datos del equipo cliente:" 25 60 16 \
-    "Nombre del equipo (sin dominio): " 1 1 "host" 1 32 25 30 \
-    "Dominio del equipo: " 2 1 "cliente.com" 2 32 25 30 \
-    "Envio de email: " 3 1 "ing@example.com.ar" 3 32 25 30 \
-    "Relayhost (Postfix): " 4 1 "172.26.0.1" 4 32 25 30 >/tmp/out.tmp \
+    "Dominio del equipo: " 2 1 "dominio.com" 2 32 25 30 \
+    "Envio de email: " 4 1 "ing@example.com.ar" 4 32 25 30 \
+    "Relayhost (Postfix): " 5 1 "172.26.0.1" 5 32 25 30 >/tmp/out.tmp \
     2>&1 >/dev/tty
 
-  HOST=$(sed -n 1p /tmp/out.tmp)
-  DOMINIO=$(sed -n 2p /tmp/out.tmp)
-  CORREO=$(sed -n 3p /tmp/out.tmp)
-  IPCORREO=$(sed -n 4p /tmp/out.tmp)
+  DOMINIO=$(sed -n 1p /tmp/out.tmp)
+  CORREO=$(sed -n 2p /tmp/out.tmp)
+  IPCORREO=$(sed -n 3p /tmp/out.tmp)
   rm -f /tmp/out.tmp
 
   # Intentamos obtener la IP principal
