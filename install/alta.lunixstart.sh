@@ -106,16 +106,15 @@ install_qemu() {
 install_motd() {
   if [[ $MOTDON -eq 0 ]]; then
     cp images/proxmox_logo.png_example images/proxmox_logo.png
+    cp systemd/vmbanner-service_example systemd/vmbanner-service
     cp systemd/pvebanner-service_example systemd/pvebanner-service
     cp systemd/pbsbanner-service_example systemd/pbsbanner-service
-    cp motd/motd.color_example motd/motd.color
   fi
 
   if [[ $PROXMOX_YES -eq 1 ]]; then
     mv /usr/bin/pvebanner /usr/bin/pvebanner.bkp
     chmod -x /usr/bin/pvebanner.bkp
     sed -i s/FECHA_ALTA/"$FECHA"/g systemd/pvebanner-service
-    #sed s/DOMINIO/"$DOMINIO"/g systemd/pvebanner-service >/usr/bin/pvebanner
     mv systemd/pvebanner-service /usr/bin/pvebanner
     chmod +x /usr/bin/pvebanner
     systemctl restart pvebanner.service
@@ -127,7 +126,6 @@ install_motd() {
     mv /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
     chmod -x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
     sed -i s/FECHA_ALTA/"$FECHA"/g systemd/pbsbanner-service
-    #sed s/DOMINIO/"$DOMINIO"/g systemd/pbsbanner-service >/usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     mv systemd/pbsbanner-service /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     systemctl restart proxmox-backup-banner.service
@@ -136,10 +134,13 @@ install_motd() {
     cp images/proxmox_logo.png /usr/share/javascript/proxmox-backup/images/.
 
   else
-    sed -i s/FECHA_ALTA/"$FECHA"/g motd/motd.color
-    sed -i "s#NAME_HOST#$NAMEHOST#g" motd/motd.color
-    sed s/nuevo.host/"$HOST"."$DOMINIO"/g motd/motd.color >/etc/motd
-    cat /etc/motd >/etc/issue
+    sed -i s/FECHA_ALTA/"$FECHA"/g systemd/vmbanner-service
+    mv systemd/vmbanner-service /usr/bin/vmbanner
+    chmod +x /usr/bin/vmbanner
+    cp systemd/vmbanner.service /lib/systemd/system/vmbanner.service
+    systemctl start vmbanner.service
+    systemctl enable vmbanner.service
+    /lib/systemd/system/vmbanner.service
   fi
 }
 
@@ -203,7 +204,7 @@ install_ssh() {
   cp hosts/hosts.deny /etc/hosts.deny
   sed -i "s/.*UseDNS\+.*/UseDNS no/" /etc/ssh/sshd_config
   sed -i "s/.*MaxAuthTries\+.*/MaxAuthTries 3/" /etc/ssh/sshd_config
-  sed -i "s/.*MaxSessions\+.*/MaxSessions 5/" /etc/ssh/sshd_config  
+  sed -i "s/.*MaxSessions\+.*/MaxSessions 5/" /etc/ssh/sshd_config
   #sed -i "s/.*PasswordAuthentication\+.*/PasswordAuthentication yes/" /etc/ssh/sshd_config
 
   if [[ ($PROXMOX_YES != 1) && ($PROXMOX_BACKUP_YES != 1) ]]; then

@@ -27,8 +27,7 @@ git clone https://github.com/avillalba96/script-altahost && cd "$(basename "$_" 
 
 ### **Cosas por hacer** 📦
 
-1. Ver de hacer una tarea que actualice el MOTD de las virtuales de forma automatica *(igual que los de proxmox)*
-2. Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
+1. Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
 
 ```bash
 rm -r /var/lib/docker

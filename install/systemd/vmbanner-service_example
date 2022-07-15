@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+
+use strict;
+
+my $localip = join('',split(/\n/,qx(ip a | grep inet | grep -v inet6 | grep -v 127.0.0.1 | head -n1 | awk -F'[/ ]+' '{print $3}')));
+my $vmversion = join('',split(/\n/,qx(lsb_release -ds)));
+my $namehost = join('',split(/\n/,qx(hostname -s)));
+my $domain = join('',split(/\n/,qx(hostname -d)));
+
+my $xline = '-' x 78;
+
+my $banner = '';
+
+if ($localip) {
+    $banner .= <<__EOBANNER;
+
+\e[1;31m
+ -----------------------------------------------------
+               #####  ${vmversion} #####
+               ## ALTA: FECHA_ALTA ##
+\e[1;32m
+                ${namehost}.${domain}
+ -----------------------------------------------------
+\e[0m
+
+__EOBANNER
+
+}
+
+open(ISSUE, ">/etc/issue");
+
+print ISSUE $banner;
+
+close(ISSUE);
+
+open(ISSUE, ">/etc/motd");
+
+print ISSUE $banner;
+
+close(ISSUE);
+
+exit (0);

@@ -1,0 +1,12 @@
+[Unit]
+Description=Host Login Banner
+ConditionPathExists=/usr/bin/vmbanner
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/vmbanner
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
