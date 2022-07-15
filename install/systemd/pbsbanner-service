@@ -6,6 +6,7 @@ use warnings;
 my $nodename = join('',split(/\n/,qx(hostname)));
 my $localip = join('',split(/\n/,qx(ip a | grep inet | grep -v inet6 | grep -v '127.0.0.1' | head -n1 | awk -F'[/ ]+' '{print \$3}')));
 my $pbsversion = join('',split(/\n/,qx(proxmox-backup-manager versions | awk '{print \$2}')));
+my $domain = join('',split(/\n/,qx(hostname -d)));
 
 
 my $xline = '-' x 78;
@@ -29,7 +30,7 @@ if ($localip) {
                #####  PBS v${pbsversion} #####
                ## ALTA: FECHA_ALTA ##
 \e[1;32m
-                ${nodename}.DOMINIO
+                ${nodename}.${domain}
 LOCAL: 	    https://${localip}:8007/
  -----------------------------------------------------
 \e[0m

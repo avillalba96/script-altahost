@@ -115,7 +115,8 @@ install_motd() {
     mv /usr/bin/pvebanner /usr/bin/pvebanner.bkp
     chmod -x /usr/bin/pvebanner.bkp
     sed -i s/FECHA_ALTA/"$FECHA"/g systemd/pvebanner-service
-    sed s/DOMINIO/"$DOMINIO"/g systemd/pvebanner-service >/usr/bin/pvebanner
+    #sed s/DOMINIO/"$DOMINIO"/g systemd/pvebanner-service >/usr/bin/pvebanner
+    mv systemd/pvebanner-service /usr/bin/pvebanner
     chmod +x /usr/bin/pvebanner
     systemctl restart pvebanner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
@@ -126,7 +127,8 @@ install_motd() {
     mv /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
     chmod -x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
     sed -i s/FECHA_ALTA/"$FECHA"/g systemd/pbsbanner-service
-    sed s/DOMINIO/"$DOMINIO"/g systemd/pbsbanner-service >/usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
+    #sed s/DOMINIO/"$DOMINIO"/g systemd/pbsbanner-service >/usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
+    mv systemd/pbsbanner-service /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     systemctl restart proxmox-backup-banner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
@@ -201,12 +203,12 @@ install_ssh() {
   cp hosts/hosts.deny /etc/hosts.deny
   sed -i "s/.*UseDNS\+.*/UseDNS no/" /etc/ssh/sshd_config
   sed -i "s/.*MaxAuthTries\+.*/MaxAuthTries 3/" /etc/ssh/sshd_config
-  sed -i "s/.*MaxSessions\+.*/MaxSessions 5/" /etc/ssh/sshd_config
+  sed -i "s/.*MaxSessions\+.*/MaxSessions 5/" /etc/ssh/sshd_config  
   #sed -i "s/.*PasswordAuthentication\+.*/PasswordAuthentication yes/" /etc/ssh/sshd_config
 
   if [[ ($PROXMOX_YES != 1) && ($PROXMOX_BACKUP_YES != 1) ]]; then
     sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin no/' /etc/ssh/sshd_config
-    sed -i "s/.*Port 22\+.*/Port 23242/" /etc/ssh/sshd_config
+    sed -i "s/.*Port \+.*/Port 23242/" /etc/ssh/sshd_config
     sed -i "s/.*LoginGraceTime\+.*/LoginGraceTime 2m/" /etc/ssh/sshd_config
     #sed -i "s/.*PasswordAuthentication\+.*/PasswordAuthentication no/" /etc/ssh/sshd_config
   fi
@@ -550,6 +552,7 @@ init_script() {
   cp others/aliases /etc/aliases
   sed -i "s/EMAILC/$CORREO/g" /etc/aliases
   postconf -e "relayhost = $IPCORREO"
+  newaliases
   systemctl restart postfix.service
 
   # Configuramos Cron
@@ -629,7 +632,7 @@ prepare_system() {
 
   # Instalamos el paquete necesario para tener el menu de instalacion
   apt-get update && apt-get upgrade -y
-  apt-get install -y dialog wget curl
+  apt-get install -y dialog wget curl lsb-release
 
   if (whiptail --title "" --yesno "Verificar tener salida irrestricta a Internet. Presione YES para continuar." 10 60); then
     DEBIANVERSION_YES=$(lsb_release -is | grep -ci "debian")
