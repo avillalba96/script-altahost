@@ -81,9 +81,10 @@ install_zabbix_basic() {
     IPZABBIX=$(sed -n 1p /tmp/out3.tmp)
     rm -f /tmp/out3.tmp
 
-    ZABBIXURL="https://repo.zabbix.com/zabbix/6.0/$(lsb_release -is | sed 's/[A-Z]/\L&/g')/pool/main/z/zabbix-release/"
-    ZABBIXVERSION="zabbix-release_6.0-3+$(lsb_release -is | sed 's/[A-Z]/\L&/g')"
-    wget "$ZABBIXURL""$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
+    ZABBIXVERSION="6.0"
+    ZABBIXSUBVERSION="zabbix-release_$ZABBIXVERSION-3+$(lsb_release -is | sed 's/[A-Z]/\L&/g')"
+    ZABBIXURL="https://repo.zabbix.com/zabbix/$ZABBIXVERSION/$(lsb_release -is | sed 's/[A-Z]/\L&/g')/pool/main/z/zabbix-release/"
+    wget "$ZABBIXURL""$ZABBIXSUBVERSION""$(lsb_release -rs)"_all.deb
 
     dpkg -i "$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
     apt-get update
