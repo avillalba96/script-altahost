@@ -28,7 +28,8 @@ install_kexec() {
     /usr/bin/env DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::='--force-confdef' install kexec-tools
     cp systemd/kexec-pve.service /etc/systemd/system/kexec-pve.service
     systemctl enable kexec-pve.service
-    echo "alias reboot-quick='systemctl kexec'" >>/root/.bashrc
+    echo "" >>/root/.bashrc
+    echo "alias reboot-quick='systemctl kexec'" >> /root/.bashrc
   fi
 }
 
