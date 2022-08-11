@@ -29,7 +29,7 @@ install_kexec() {
     cp systemd/kexec-pve.service /etc/systemd/system/kexec-pve.service
     systemctl enable kexec-pve.service
     echo "" >>/root/.bashrc
-    echo "alias reboot-quick='systemctl kexec'" >> /root/.bashrc
+    echo "alias reboot-quick='systemctl kexec'" >>/root/.bashrc
   fi
 }
 
@@ -83,11 +83,14 @@ install_zabbix_basic() {
     rm -f /tmp/out3.tmp
 
     ZABBIXVERSION="6.0"
-    ZABBIXSUBVERSION="zabbix-release_$ZABBIXVERSION-3+$(lsb_release -is | sed 's/[A-Z]/\L&/g')"
-    ZABBIXURL="https://repo.zabbix.com/zabbix/$ZABBIXVERSION/$(lsb_release -is | sed 's/[A-Z]/\L&/g')/pool/main/z/zabbix-release/"
-    wget "$ZABBIXURL""$ZABBIXSUBVERSION""$(lsb_release -rs)"_all.deb
+    ZABBIXSUBVERSION="3"
+    ZABBIX_SO=$(lsb_release -is | sed 's/[A-Z]/\L&/g')
+    ZABBIX_SO_ID=$(lsb_release -rs)
+    ZABBIXARCHIVE="zabbix-release_$ZABBIXVERSION-$ZABBIXSUBVERSION+$ZABBIX_SO"$ZABBIX_SO_ID"_all.deb"
+    ZABBIXURL="https://repo.zabbix.com/zabbix/$ZABBIXVERSION/$ZABBIX_SO/pool/main/z/zabbix-release/$ZABBIXARCHIVE"
+    wget "$ZABBIXURL"
 
-    dpkg -i "$ZABBIXVERSION""$(lsb_release -rs)"_all.deb
+    dpkg -i $ZABBIXARCHIVE
     apt-get update
     aptitude install -y zabbix-agent
     sed -i s/ZABBIXIP/"$IPZABBIX"/g zabbix/zabbix_agentd.conf
