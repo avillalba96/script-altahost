@@ -124,6 +124,7 @@ install_motd() {
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
     sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
     cp images/proxmox_logo.png /usr/share/pve-manager/images/.
+    systemctl restart pveproxy.service
 
   elif [[ $PROXMOX_BACKUP_YES -eq 1 ]]; then
     mv /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
@@ -136,6 +137,7 @@ install_motd() {
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
     sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
     cp images/proxmox_logo.png /usr/share/javascript/proxmox-backup/images/.
+    systemctl restart proxmox-backup-proxy.service
 
   else
     sed -i s/FECHA_ALTA/"$FECHA"/g systemd/vmbanner-service
