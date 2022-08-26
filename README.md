@@ -7,6 +7,7 @@ Script para dar alta a UBUNTU/DEBIAN/PVE/PBS en base a necesidad de Lunix SRL
 ```bash
 Cloud/Debian9+
 Cloud/Ubuntu20.04+
+Ubuntu+Docker
 PVE v6+
 PBS v1+
 ```
