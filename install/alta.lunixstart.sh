@@ -459,7 +459,7 @@ finish_script() {
   cd "$DIRALTA" || return
   cd ..
   cd ..
-  rm -rf alta* && rm -rf script-altahost*
+  rm -rf alta* && rm -rf script-altahost* && rm -rf .wget-hsts
 
   clear
   echo ""
