@@ -29,6 +29,7 @@ install_kexec() {
     cp systemd/kexec-pve.service /etc/systemd/system/kexec-pve.service
     systemctl enable kexec-pve.service
     echo "" >>/root/.bashrc
+    echo "" >>/root/.bashrc
     echo "alias reboot-quick='systemctl kexec'" >>/root/.bashrc
   fi
 }

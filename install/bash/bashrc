@@ -100,3 +100,4 @@ if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
 fi
 
 export HISTTIMEFORMAT="%d/%m/%y %T "
+
