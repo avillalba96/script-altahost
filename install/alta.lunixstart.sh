@@ -564,8 +564,8 @@ init_script() {
   cp others/aliases /etc/aliases
   sed -i "s/EMAILC/$CORREO/g" /etc/aliases
   postconf -e "relayhost = $IPCORREO"
-  newaliases
   systemctl restart postfix.service
+  newaliases
 
   # Configuramos Cron
   cat crontab/modelo_crontab >>/var/spool/cron/crontabs/root
