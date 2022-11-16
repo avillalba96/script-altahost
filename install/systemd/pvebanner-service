@@ -28,7 +28,6 @@ if ($localip) {
 \e[1;31m
  -----------------------------------------------------
                #####  PROXMOX v${pveversion} #####
-               ## ALTA: FECHA_ALTA ##
 \e[1;32m
                 ${nodename}.${domain}
 LOCAL: 	    https://${localip}:8006/
