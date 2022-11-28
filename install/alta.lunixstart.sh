@@ -361,6 +361,7 @@ config_raid_zfs() {
 
   # Instalar sanoid para snaps de mv (Esto causa un incremento en IO-Delay)
   if (whiptail --title "" --yesno "Desea instalar SANOID?" 10 60); then
+    apt-get install libc6=2.31-13+deb11u4 -y
     apt-get install debhelper libcapture-tiny-perl libconfig-inifiles-perl pv lzop mbuffer build-essential git -y
     git clone https://github.com/jimsalterjrs/sanoid.git
     cd sanoid || exit
