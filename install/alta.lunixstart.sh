@@ -136,7 +136,7 @@ install_motd() {
     sed -i s/FECHA_ALTA/"$FECHA"/g systemd/pbsbanner-service
     mv systemd/pbsbanner-service /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
-    chattr +i /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
+    #chattr +i /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     systemctl restart proxmox-backup-banner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
     sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
@@ -147,7 +147,7 @@ install_motd() {
     sed -i s/FECHA_ALTA/"$FECHA"/g systemd/vmbanner-service
     mv systemd/vmbanner-service /usr/bin/vmbanner
     chmod +x /usr/bin/vmbanner
-    chattr +i /usr/bin/vmbanner
+    #chattr +i /usr/bin/vmbanner
     cp systemd/vmbanner.service /lib/systemd/system/vmbanner.service
     systemctl start vmbanner.service
     systemctl enable vmbanner.service
