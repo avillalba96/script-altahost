@@ -29,14 +29,14 @@ Cuando se actualizan los paquetes de PVE/PBS estos sobreescriben nuestro banner 
 wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/systemd/pvebanner-service -O /usr/bin/pvebanner && chmod +x /usr/bin/pvebanner
 sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
 sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-wget https://github.com/avillalba96/script-altahost/raw/main/install/images/proxmox_logo.png -O /usr/share/pve-manager/images/.
+wget https://github.com/avillalba96/script-altahost/raw/main/install/images/proxmox_logo.png -O /usr/share/pve-manager/images/proxmox_logo.png
 systemctl restart pvebanner.service
 systemctl restart pveproxy.service
 # PBS
 wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/systemd/pbsbanner-service -O /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner && chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
 sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
 sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-wget https://github.com/avillalba96/script-altahost/raw/main/install/images/proxmox_logo.png -O /usr/share/javascript/proxmox-backup/images/.
+wget https://github.com/avillalba96/script-altahost/raw/main/install/images/proxmox_logo.png -O /usr/share/javascript/proxmox-backup/images/proxmox_logo.png
 systemctl restart proxmox-backup-banner.service
 systemctl restart proxmox-backup-proxy.service
 
