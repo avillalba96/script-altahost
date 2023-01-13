@@ -73,7 +73,18 @@ pvesm set local-zfs --sparse 1
 1. Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
 
 ```bash
-rm -r /var/lib/docker
+#Create folder
 mkdir -p /u/var-lib-docker
+#Stop all containers
+systemctl stop docker.socket
+systemctl stop docker.service
+systemctl stop containerd.service
+#Copy all data
+rsync -avh --progress /var/lib/docker/ /u/var-lib-docker/.
+#Remove old folder
+rm -r /var/lib/docker
+#Create symlink
 ln -s /u/var-lib-docker /var/lib/docker
+#Reboot and start all containers
+reboot
 ```
