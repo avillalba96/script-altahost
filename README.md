@@ -71,7 +71,8 @@ pvesm set local-zfs --sparse 1
 ### **Cosas por hacer** 📦
 
 0. Sacar de la instalacion la opcion de KEXEC
-1. Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
+1. Generar instalacion de cliente teleport (ver tema de usar token permanente y/o rotativo)
+2. Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
 
 ```bash
 #Create folder
