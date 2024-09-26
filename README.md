@@ -74,6 +74,8 @@ pvesm set local-zfs --sparse 1
 1. Sacar de la instalacion la opcion de KEXEC
 2. Generar instalacion de cliente teleport (ver tema de usar token permanente y/o rotativo)
 3. Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
+4. borg version, zabbix version, docker version, ubuntu/debian version, generate_user, colores en los logs y echo, que sea mas generico y no tanto LUNIX(por ejemplo el motd traerlo de un url, el usuario, el borg, lo que sea que haga referencia a lunix) la idea es lograr un altahosts mas generalizado
+5. Ver de pasar a python a futuro
 
 ```bash
 #Create folder
