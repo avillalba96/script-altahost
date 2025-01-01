@@ -1,6 +1,6 @@
 # **script-altahost**
 
-Script para dar alta a UBUNTU/DEBIAN/PVE/PBS en base a necesidad de Lunix SRL
+Script para dar alta a UBUNTU/DEBIAN/PVE/PBS en base a necesidad de Lunix SRL, **pero se puede usar de forma generica para cualquier cliente**
 
 **Verificado en:**
 
@@ -70,28 +70,5 @@ pvesm set local-zfs --sparse 1
 
 ### **Cosas por hacer** 📦
 
-* Ver altahosts.log, hay errores *(tmbn esta el script alta vpn, una linea)*
+* Agregar alta con wireguard y dialog <https://github.com/avillalba96/mkt-wireguard_init>
 * Verficiar porque no se genera /var/log/syslog *(proxmox sabemos que no se genera)*
-* Sacar de la instalacion la opcion de KEXEC
-* Generar instalacion de cliente teleport (ver tema de usar token permanente y/o rotativo)
-* borg version y completo, zabbix version, docker version, ubuntu/debian version, generate_user, colores en los logs y echo, que sea mas generico y no tanto LUNIX(por ejemplo el motd traerlo de un url, el usuario, el borg, lo que sea que haga referencia a lunix) la idea es lograr un altahosts mas generalizado
-* generalirar vpn-ssp *(la palabra no molesta)*, quitar el checkping no hace falta
-* no genera el /etc/lunix/alta_lunix al finalizar correctamente, pero tmbn generalizarlo
-* Generar para docker la carpeta en /u/var-lib/docker (revisar como solucionar al no tener el disco secundario montado)
-
-```bash
-#Create folder
-mkdir -p /u/var-lib-docker
-#Stop all containers
-systemctl stop docker.socket
-systemctl stop docker.service
-systemctl stop containerd.service
-#Copy all data
-rsync -avh --progress /var/lib/docker/ /u/var-lib-docker/.
-#Remove old folder
-rm -r /var/lib/docker
-#Create symlink
-ln -s /u/var-lib-docker /var/lib/docker
-#Reboot and start all containers
-reboot
-```

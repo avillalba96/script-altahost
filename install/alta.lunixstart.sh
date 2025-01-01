@@ -20,20 +20,6 @@ install_amdfixes() {
   fi
 }
 
-install_kexec() {
-  if [[ $KEXEC -eq 1 ]]; then
-    ## Install kexec, allows for quick reboots into the latest updated kernel set as primary in the boot-loader.
-    # use command 'reboot-quick'
-    echo "kexec-tools kexec-tools/load_kexec boolean false" | debconf-set-selections
-    /usr/bin/env DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::='--force-confdef' install kexec-tools
-    cp systemd/kexec-pve.service /etc/systemd/system/kexec-pve.service
-    systemctl enable kexec-pve.service
-    echo "" >>/root/.bashrc
-    echo "" >>/root/.bashrc
-    echo "alias reboot-quick='systemctl kexec'" >>/root/.bashrc
-  fi
-}
-
 install_ksmtuned() {
   if [[ $KSMTUNED -eq 1 ]]; then
     ## Ensure ksmtuned (ksm-control-daemon) is enabled and optimise according to ram size
@@ -126,7 +112,11 @@ install_motd() {
     #chattr +i /usr/bin/pvebanner
     systemctl restart pvebanner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-    sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+
+    if [[ $MOTDON -ne 1 ]]; then
+      sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    fi
+
     cp images/proxmox_logo.png /usr/share/pve-manager/images/.
     systemctl restart pveproxy.service
 
@@ -139,7 +129,11 @@ install_motd() {
     #chattr +i /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     systemctl restart proxmox-backup-banner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-    sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+
+    if [[ $MOTDON -ne 1 ]]; then
+      sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    fi
+
     cp images/proxmox_logo.png /usr/share/javascript/proxmox-backup/images/.
     systemctl restart proxmox-backup-proxy.service
 
@@ -174,8 +168,11 @@ install_docker() {
   $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 
   apt-get update
-  apt-get install docker-ce docker-ce-cli containerd.io -y
-  COMPOSEVERSION="2.27.0"
+  if ! apt-get install docker-ce docker-ce-cli containerd.io -y; then
+    ERRORS+="[ERROR] Falló la instalación de Docker.\n"
+  fi
+
+  COMPOSEVERSION="2.30.3"
   curl -L "https://github.com/docker/compose/releases/download/v$COMPOSEVERSION/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
   chmod +x /usr/local/bin/docker-compose
 
@@ -190,6 +187,24 @@ install_docker() {
   # UWF-DOCKER (https://github.com/chaifeng/ufw-docker)
   wget -O /usr/local/bin/ufw-docker https://github.com/chaifeng/ufw-docker/raw/master/ufw-docker
   chmod +x /usr/local/bin/ufw-docker
+
+  # Verificar y configurar disco secundario
+  if mountpoint -q /u/; then
+    echo -e "\e[32m[OK]\e[0m Disco secundario montado en /u/. Configurando carpeta para Docker..."
+  else
+    WARNINGS+="[WARNING] No se detecta un disco secundario montado en /u/. Revisar configuración de fstab y formateo.\n"
+    mkdir -p /u/var-lib-docker
+  fi
+
+  # Reconfigurar Docker para usar /u/var-lib-docker
+  echo -e "\e[34m[INFO]\e[0m Configurando Docker para usar /u/var-lib-docker..."
+  systemctl stop docker.socket
+  systemctl stop docker.service
+  systemctl stop containerd.service
+
+  rsync -avh --progress /var/lib/docker/ /u/var-lib-docker/.
+  rm -r /var/lib/docker
+  ln -s /u/var-lib-docker /var/lib/docker
 }
 
 install_zabbix_docker() {
@@ -394,8 +409,7 @@ install_server_proxmox() {
   # Select package
   cmd=(dialog --separate-output --checklist "Seleccionar paquetes a instalar:" 22 76 16)
   Opcions=(1 "Proxmox - AMDFIXES" off
-    2 "Proxmox - KEXEC" off
-    3 "Proxmox - KSMTUNED" off)
+    2 "Proxmox - KSMTUNED" off)
   choices=$("${cmd[@]}" "${Opcions[@]}" 2>&1 >/dev/tty)
   clear
   for choice in $choices; do
@@ -404,9 +418,6 @@ install_server_proxmox() {
       AMDFIXES=1
       ;;
     2)
-      KEXEC=1
-      ;;
-    3)
       KSMTUNED=1
       ;;
     esac
@@ -466,7 +477,20 @@ finish_script() {
   clear
   echo ""
   echo -e "\e[1;32m++++++++++++++++++++++++++++++++++++++++++++++++\e[0m"
-  echo -e "\e[0mFelicitaciones, el proceso a finalizado\e[0m"
+
+  if [[ -n "$ERRORS" ]]; then
+    echo -e "\e[0;31mSe detectaron los siguientes errores durante la ejecución:\e[0m"
+    echo -e "$ERRORS"
+    echo ""
+  fi
+
+  if [[ -n "$WARNINGS" ]]; then
+    echo -e "\e[1;33mSe detectaron las siguientes advertencias:\e[0m"
+    echo -e "$WARNINGS"
+    echo ""
+  fi
+
+  echo -e "\e[0mFelicitaciones, el proceso ha finalizado\e[0m"
   echo ""
   echo -e "\e[0;31mHOST: \e[1;33m$HOST.$DOMINIO\e[0m"
   echo ""
@@ -530,6 +554,7 @@ init_script() {
   else
     cp apt/ubuntu/sources.list /etc/apt/sources.list
   fi
+  rm -f /etc/apt/sources.list.d/ubuntu.sources
   apt-get update
   apt-get -y install aptitude gnupg2 gnupg
   aptitude update
@@ -614,7 +639,6 @@ start_install() {
     install_server_proxmox
     config_raid
     install_amdfixes
-    install_kexec
     install_ksmtuned
   elif [[ $PROXMOX_BACKUP_YES -eq 1 ]]; then
     generate_user
@@ -634,7 +658,7 @@ start_install() {
 prepare_system() {
   # Generamos flag de instalacion
   mkdir /etc/lunix 2>/dev/null
-  echo "1" >/etc/lunix/alta_lunix
+  echo "1" >/etc/lunix/alta_script
 
   # Deshabilitamos IPV6
   echo -e "Acquire::ForceIPv4 \"true\";\\n" >/etc/apt/apt.conf.d/99-force-ipv4
@@ -652,7 +676,7 @@ prepare_system() {
     UBUNTUVERSION_YES=$(lsb_release -is | grep -ci "ubuntu")
 
     if [[ ("$DEBIANVERSION_YES" == 0) && ("$UBUNTUVERSION_YES" == 0) ]]; then
-      rm /etc/lunix/alta_lunix
+      rm /etc/lunix/alta_script
       clear
       echo -e "\e[0;31m[ERROR]: \e[0mNo se detecto SO compatible para este script\e[0m"
       exit
@@ -660,7 +684,7 @@ prepare_system() {
       start_install
     fi
   else
-    rm /etc/lunix/alta_lunix
+    rm /etc/lunix/alta_script
     clear
     echo -e "\e[0;31m[ERRO]: \e[0mSe cancelo la instalacion de SCRIPT ALTA\e[0m"
     exit
@@ -679,14 +703,13 @@ main() {
     BORGON=0
     QEMUON=0
     AMDFIXES=0
-    KEXEC=0
     KSMTUNED=0
     MOTDON=0
 
     # Iniciando instalacion
     clear
     mkdir /var/log/lunix/
-    if [[ -f /etc/lunix/alta_lunix ]]; then
+    if [[ -f /etc/lunix/alta_script ]]; then
       echo -e "\e[0;31m[ERROR]: \e[0mEl equipo ya se encuentra dado de alta\e[0m"
       exit
     fi

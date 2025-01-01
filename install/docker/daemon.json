@@ -1,4 +1,15 @@
 {
- "default-address-pools": [{"base":"10.88.0.0/16","size":24}],
- "userns-remap": "default"
-}
+    "default-address-pools": [
+      {
+        "base": "10.88.0.0/16",
+        "size": 24
+      }
+    ],
+    "userns-remap": "default",
+    "log-driver": "json-file",
+    "log-opts": {
+      "max-size": "100m",
+      "max-file": "3"
+    }
+  }
+  
