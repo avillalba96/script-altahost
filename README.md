@@ -72,6 +72,7 @@ pvesm set local-zfs --sparse 1
 
 * Agregar alta con wireguard y dialog <https://github.com/avillalba96/mkt-wireguard_init>
 * Verficiar porque no se genera /var/log/syslog *(proxmox sabemos que no se genera)*
+* Que el usuario que genera "lunix" sea consultado para volverlo generico
 * Se detectaron los siguientes errores:
 
 ```bash
