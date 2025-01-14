@@ -231,12 +231,14 @@ install_ssh() {
   sed -i "s/.*UseDNS\+.*/UseDNS no/" /etc/ssh/sshd_config
   sed -i "s/.*MaxAuthTries\+.*/MaxAuthTries 3/" /etc/ssh/sshd_config
   sed -i "s/.*MaxSessions\+.*/MaxSessions 5/" /etc/ssh/sshd_config
-  #sed -i "s/.*PasswordAuthentication\+.*/PasswordAuthentication yes/" /etc/ssh/sshd_config
-
+  sed -i "s/.*ClientAliveInterval\+.*/ClientAliveInterval 300/" /etc/ssh/sshd_config
+  sed -i "s/.*ClientAliveCountMax\+.*/ClientAliveCountMax 0/" /etc/ssh/sshd_config
+  sed -i "s/.*MaxStartups\+.*/MaxStartups 10:30:60/" /etc/ssh/sshd_config
+  sed -i "s/.*LoginGraceTime\+.*/LoginGraceTime 2m/" /etc/ssh/sshd_config
+  
   if [[ ($PROXMOX_YES != 1) && ($PROXMOX_BACKUP_YES != 1) ]]; then
     sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin no/' /etc/ssh/sshd_config
     sed -i "s/.*Port \+.*/Port 23242/" /etc/ssh/sshd_config
-    sed -i "s/.*LoginGraceTime\+.*/LoginGraceTime 2m/" /etc/ssh/sshd_config
     #sed -i "s/.*PasswordAuthentication\+.*/PasswordAuthentication no/" /etc/ssh/sshd_config
   fi
 }
