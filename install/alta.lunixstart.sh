@@ -191,20 +191,15 @@ install_docker() {
   # Verificar y configurar disco secundario
   if mountpoint -q /u/; then
     echo -e "\e[32m[OK]\e[0m Disco secundario montado en /u/. Configurando carpeta para Docker..."
+
+    mkdir -p /u/var-lib-docker
+    systemctl stop docker.socket && systemctl stop docker.service && systemctl stop containerd.service
+    rsync -avh --progress /var/lib/docker/ /u/var-lib-docker/.
+    rm -r /var/lib/docker && ln -s /u/var-lib-docker /var/lib/docker
+
   else
     WARNINGS+="[WARNING] No se detecta un disco secundario montado en /u/. Revisar configuración de fstab y formateo.\n"
-    mkdir -p /u/var-lib-docker
   fi
-
-  # Reconfigurar Docker para usar /u/var-lib-docker
-  echo -e "\e[34m[INFO]\e[0m Configurando Docker para usar /u/var-lib-docker..."
-  systemctl stop docker.socket
-  systemctl stop docker.service
-  systemctl stop containerd.service
-
-  rsync -avh --progress /var/lib/docker/ /u/var-lib-docker/.
-  rm -r /var/lib/docker
-  ln -s /u/var-lib-docker /var/lib/docker
 }
 
 install_zabbix_docker() {
@@ -517,7 +512,7 @@ init_script() {
   grep -rl SO_VERSION apt/. | xargs sed -i "s/SO_VERSION/${VERSIONSO}/g" 2>/dev/null
 
   # Ingresando datos del equipo
-  HOST=$(hostname)  
+  HOST=$(hostname)
   dialog --clear \
     --form "Completar datos del equipo cliente:" 25 60 16 \
     "Dominio del equipo: " 1 1 "dominio.com" 1 32 25 30 \
