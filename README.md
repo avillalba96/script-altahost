@@ -14,8 +14,21 @@ PBS v1+
 
 ## **Instalación** 🔧
 
+* Primero: Instalar las dependencias necesarias
+
 ```bash
 apt-get update; apt-get install -y git screen
+```
+
+* Segundo: Ejecutar screen para correr en segundo plano
+
+```bash
+screen
+```
+
+* Tercero: Ejecutar script
+
+```bash
 git clone https://github.com/avillalba96/script-altahost && cd "$(basename "$_" .git)" && cd install && ./alta.lunixstart.sh
 ```
 
