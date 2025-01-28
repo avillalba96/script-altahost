@@ -235,7 +235,7 @@ install_ssh() {
   sed -i "s/.*ClientAliveCountMax\+.*/ClientAliveCountMax 0/" /etc/ssh/sshd_config
   sed -i "s/.*MaxStartups\+.*/MaxStartups 10:30:60/" /etc/ssh/sshd_config
   sed -i "s/.*LoginGraceTime\+.*/LoginGraceTime 2m/" /etc/ssh/sshd_config
-  
+
   if [[ ($PROXMOX_YES != 1) && ($PROXMOX_BACKUP_YES != 1) ]]; then
     sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin no/' /etc/ssh/sshd_config
     sed -i "s/.*Port \+.*/Port $SSH_PORT/" /etc/ssh/sshd_config
@@ -517,23 +517,27 @@ init_script() {
   grep -rl SO_VERSION apt/. | xargs sed -i "s/SO_VERSION/${VERSIONSO}/g" 2>/dev/null
 
   # Ingresando datos del equipo
+  HOST=$(hostname)  
   dialog --clear \
     --form "Completar datos del equipo cliente:" 25 60 16 \
-    "Dominio del equipo: " 2 1 "dominio.com" 2 32 25 30 \
-    "Usuario genérico: " 3 1 "lunix" 3 32 25 30 \
-    "Contraseña del usuario: " 4 1 "" 4 32 25 30 \
-    "Puerto SSH: " 5 1 "23242" 5 32 25 30 \
-    "Envio de email: " 6 1 "ing@example.com.ar" 6 32 25 30 \
-    "Relayhost (Postfix): " 7 1 "172.26.0.1" 7 32 25 30 >/tmp/out.tmp \
+    "Dominio del equipo: " 1 1 "dominio.com" 1 32 25 30 \
+    "Usuario generico: " 2 1 "lunix" 2 32 25 30 \
+    "Puerto SSH: " 3 1 "23242" 3 32 25 30 \
+    "Envio de email: " 4 1 "ing@example.com.ar" 4 32 25 30 \
+    "Relayhost (Postfix): " 5 1 "172.26.0.1" 5 32 25 30 \
+    --insecure --passwordbox "Contrasena del usuario:" 6 50 >/tmp/out.tmp \
     2>&1 >/dev/tty
+
+  tr -d " \t" </tmp/out.tmp >/tmp/out2.tmp
+  grep "\S" /tmp/out2.tmp >/tmp/out.tmp
 
   DOMINIO=$(sed -n 1p /tmp/out.tmp)
   GENERIC_USER=$(sed -n 2p /tmp/out.tmp)
-  USER_PASSWORD=$(sed -n 3p /tmp/out.tmp)
-  SSH_PORT=$(sed -n 4p /tmp/out.tmp)
-  CORREO=$(sed -n 5p /tmp/out.tmp)
-  IPCORREO=$(sed -n 6p /tmp/out.tmp)
-  rm -f /tmp/out.tmp
+  SSH_PORT=$(sed -n 3p /tmp/out.tmp)
+  CORREO=$(sed -n 4p /tmp.out.tmp)
+  IPCORREO=$(sed -n 5p /tmp/out.tmp)
+  USER_PASSWORD=$(sed -n 6p /tmp/out.tmp)
+  rm -f /tmp/out.tmp /tmp/out2.tmp
 
   # Intentamos obtener la IP principal
   IP=$(ip a | grep inet | grep -v inet6 | grep -v 127.0.0.1 | head -n1 | awk -F'[/ ]+' '{print $3}')
