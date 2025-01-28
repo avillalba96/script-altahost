@@ -217,10 +217,10 @@ install_zabbix_docker() {
 }
 
 generate_user() {
-  useradd lunix -m -d /home/lunix -s /bin/bash
-  echo ""
-  echo "Colocar contraseña para el usuario 'lunix': "
-  passwd lunix
+  useradd "$GENERIC_USER" -m -d "/home/$GENERIC_USER" -s /bin/bash
+  if [[ $? -eq 0 ]]; then
+    echo "$GENERIC_USER:$USER_PASSWORD" | chpasswd
+  fi
 }
 
 install_ssh() {
@@ -238,7 +238,7 @@ install_ssh() {
   
   if [[ ($PROXMOX_YES != 1) && ($PROXMOX_BACKUP_YES != 1) ]]; then
     sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin no/' /etc/ssh/sshd_config
-    sed -i "s/.*Port \+.*/Port 23242/" /etc/ssh/sshd_config
+    sed -i "s/.*Port \+.*/Port $SSH_PORT/" /etc/ssh/sshd_config
     #sed -i "s/.*PasswordAuthentication\+.*/PasswordAuthentication no/" /etc/ssh/sshd_config
   fi
 }
@@ -517,17 +517,22 @@ init_script() {
   grep -rl SO_VERSION apt/. | xargs sed -i "s/SO_VERSION/${VERSIONSO}/g" 2>/dev/null
 
   # Ingresando datos del equipo
-  HOST=$(hostname)
   dialog --clear \
     --form "Completar datos del equipo cliente:" 25 60 16 \
     "Dominio del equipo: " 2 1 "dominio.com" 2 32 25 30 \
-    "Envio de email: " 4 1 "ing@example.com.ar" 4 32 25 30 \
-    "Relayhost (Postfix): " 5 1 "172.26.0.1" 5 32 25 30 >/tmp/out.tmp \
+    "Usuario genérico: " 3 1 "lunix" 3 32 25 30 \
+    "Contraseña del usuario: " 4 1 "" 4 32 25 30 \
+    "Puerto SSH: " 5 1 "23242" 5 32 25 30 \
+    "Envio de email: " 6 1 "ing@example.com.ar" 6 32 25 30 \
+    "Relayhost (Postfix): " 7 1 "172.26.0.1" 7 32 25 30 >/tmp/out.tmp \
     2>&1 >/dev/tty
 
   DOMINIO=$(sed -n 1p /tmp/out.tmp)
-  CORREO=$(sed -n 2p /tmp/out.tmp)
-  IPCORREO=$(sed -n 3p /tmp/out.tmp)
+  GENERIC_USER=$(sed -n 2p /tmp/out.tmp)
+  USER_PASSWORD=$(sed -n 3p /tmp/out.tmp)
+  SSH_PORT=$(sed -n 4p /tmp/out.tmp)
+  CORREO=$(sed -n 5p /tmp/out.tmp)
+  IPCORREO=$(sed -n 6p /tmp/out.tmp)
   rm -f /tmp/out.tmp
 
   # Intentamos obtener la IP principal
