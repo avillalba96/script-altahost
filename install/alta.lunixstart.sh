@@ -523,6 +523,7 @@ init_script() {
     --insecure --passwordbox "Contrasena del usuario:" 6 50 >/tmp/out.tmp \
     2>&1 >/dev/tty
 
+  cp /tmp/out.tmp /var/log/out.tmp #TEMPORAL
   tr -d " \t" </tmp/out.tmp >/tmp/out2.tmp
   grep "\S" /tmp/out2.tmp >/tmp/out.tmp
 
