@@ -219,7 +219,8 @@ generate_user() {
 }
 
 install_ssh() {
-  aptitude install -y geoip-bin geoip-database
+  #aptitude install -y geoip-bin geoip-database
+  curl -Ls https://github.com/ipinfo/cli/releases/download/ipinfo-3.3.1/deb.sh | sh
   sed -i s/VMLUNIX/"$HOST"/g /etc/ssh/*
   cp hosts/hosts.allow /etc/hosts.allow
   cp hosts/hosts.deny /etc/hosts.deny
