@@ -1,21 +1,31 @@
 #!/bin/bash
 
-# UPPERCASE space-separated country codes to ACCEPT
 ALLOW_COUNTRIES="AR"
 
 if [ $# -ne 1 ]; then
   echo "Usage:  `basename $0` <ip>" 1>&2
-  exit 0 # return true in case of config issue
+  exit 0
 fi
 
-COUNTRY=`/usr/bin/geoiplookup $1 | awk -F ": " '{ print $2 }' | awk -F "," '{ print $1 }' | head -n 1`
+# Extraer IPv4 de cualquier cosa que tenga el formato IPv6/IPv4-mapeado
+IP=$(echo "$1" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
 
-[[ $COUNTRY = "IP Address not found" || $ALLOW_COUNTRIES =~ $COUNTRY ]] && RESPONSE="ALLOW" || RESPONSE="DENY"
+# Si no se pudo extraer una IPv4, bloquear
+if [ -z "$IP" ]; then
+  logger "DENY sshd connection from $1 (no IPv4 found)"
+  exit 1
+fi
 
-if [ $RESPONSE = "ALLOW" ]
-then
+COUNTRY=$(/usr/bin/geoiplookup "$IP" | awk -F ": " '{ print $2 }' | awk -F "," '{ print $1 }' | head -n 1)
+
+if [[ "$COUNTRY" == "IP Address not found" ]]; then
+  logger "DENY sshd connection from $1 ($COUNTRY)"
+  exit 1
+fi
+
+if [[ "$ALLOW_COUNTRIES" =~ $COUNTRY ]]; then
   exit 0
 else
-  logger "$RESPONSE sshd connection from $1 ($COUNTRY)"
+  logger "DENY sshd connection from $1 ($COUNTRY)"
   exit 1
 fi
