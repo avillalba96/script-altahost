@@ -172,7 +172,7 @@ install_docker() {
     ERRORS+="[ERROR] Falló la instalación de Docker.\n"
   fi
 
-  COMPOSEVERSION="2.30.3"
+  COMPOSEVERSION="2.38.2"
   curl -L "https://github.com/docker/compose/releases/download/v$COMPOSEVERSION/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
   chmod +x /usr/local/bin/docker-compose
 
