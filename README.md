@@ -83,7 +83,9 @@ pvesm set local-zfs --sparse 1
 * **Pablito** - [Pablo Ramos](https://github.com/avillalba96)
 * **Alejandro** - [Alejandro Villalba](https://github.com/avillalba96)
 
-### **Cosas por hacer** 📦
+### **TO-DO** 📦
 
 * Agregar alta con wireguard y dialog <https://github.com/avillalba96/mkt-wireguard_init>
 * Verficiar porque no se genera /var/log/syslog *(proxmox sabemos que no se genera)*
+* Eliminar total referencia de lunix y/o similares, volverlo lo mas generico posible, usar usuario o demas como "altahost"
+* Acomodar el puerto que define SSH, que reemplaze cualquier existente, actualmente a veces agrega 2 lineas a sshd_config
