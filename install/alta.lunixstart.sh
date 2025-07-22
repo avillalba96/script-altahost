@@ -531,7 +531,7 @@ init_script() {
   DOMINIO=$(sed -n 1p /tmp/out.tmp)
   GENERIC_USER=$(sed -n 2p /tmp/out.tmp)
   SSH_PORT=$(sed -n 3p /tmp/out.tmp)
-  CORREO=$(sed -n 4p /tmp.out.tmp)
+  CORREO=$(sed -n 4p /tmp/out.tmp)
   IPCORREO=$(sed -n 5p /tmp/out.tmp)
   USER_PASSWORD=$(sed -n 6p /tmp/out.tmp)
   rm -f /tmp/out.tmp /tmp/out2.tmp
