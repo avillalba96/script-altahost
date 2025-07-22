@@ -57,6 +57,12 @@ wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/
 wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/systemd/pbsbanner-service_custom -O /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner && chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner && systemctl restart proxmox-backup-banner.service
 ```
 
+## TO-DO
+
+* Volver Generico <https://github.com/avillalba96/borg_config>
+* Implementar el script de forma generica <https://github.com/avillalba96/script-pve_cloudinit>
+
+
 ## Autores
 
 - Maxi - [Maximiliano Baez](https://github.com/MaximilianoBz)
