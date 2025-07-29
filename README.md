@@ -57,6 +57,19 @@ wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/
 wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/systemd/pbsbanner-service_custom -O /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner && chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner && systemctl restart proxmox-backup-banner.service
 ```
 
+### RAID ZFS (configuracion basica, machete)
+
+Se deja a mano los comandos aplicados sobre local-zfs
+
+```bash
+zfs set reservation=20G rpool/ROOT
+zfs set dedup=off rpool
+zfs set compression=lz4 rpool
+zfs set sync=disabled rpool
+pvesm set local-zfs --blocksize 128k
+pvesm set local-zfs --sparse 1
+```
+
 ## TO-DO
 
 * Volver Generico <https://github.com/avillalba96/borg_config>
