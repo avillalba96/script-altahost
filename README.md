@@ -72,9 +72,10 @@ pvesm set local-zfs --sparse 1
 
 ## TO-DO
 
-* Volver Generico <https://github.com/avillalba96/borg_config>
-* Implementar el script de forma generica <https://github.com/avillalba96/script-pve_cloudinit>
-
+. Probar que se instale los MOTD
+. Probar instalar WireGuard
+. Volver Generico <https://github.com/avillalba96/borg_config>
+. Implementar el script de forma generica <https://github.com/avillalba96/script-pve_cloudinit>
 
 ## Autores
 

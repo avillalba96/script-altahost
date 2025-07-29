@@ -96,15 +96,39 @@ install_qemu() {
 }
 
 install_motd() {
-    # Usar logo oficial de Proxmox directamente
-    # Usar logo custom
-    cp images/proxmox_logo_custom.png /usr/share/pve-manager/images/proxmox_logo.png
-    cp images/proxmox_logo.png /usr/share/pve-manager/images/proxmox_logo.png
-    cp images/proxmox_logo.png /usr/share/proxmox-backup/images/proxmox_logo.png
-    # Usar banners *_custom en vez de *_example
-    cp systemd/pvebanner-service_custom /usr/bin/pvebanner
-    cp systemd/pbsbanner-service_custom /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
-    cp systemd/vmbanner-service_custom /usr/bin/vmbanner
+    cp systemd/vmbanner-service_custom systemd/vmbanner-service
+    cp systemd/pvebanner-service_custom systemd/pvebanner-service
+    cp systemd/pbsbanner-service_custom systemd/pbsbanner-service
+
+  if [[ $PROXMOX_YES -eq 1 ]]; then
+    mv /usr/bin/pvebanner /usr/bin/pvebanner.bkp
+    chmod -x /usr/bin/pvebanner.bkp
+    mv systemd/pvebanner-service /usr/bin/pvebanner
+    chmod +x /usr/bin/pvebanner
+    #chattr +i /usr/bin/pvebanner
+    systemctl restart pvebanner.service
+    sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    systemctl restart pveproxy.service
+
+  elif [[ $PROXMOX_BACKUP_YES -eq 1 ]]; then
+    mv /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
+    chmod -x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
+    mv systemd/pbsbanner-service /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
+    chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
+    #chattr +i /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
+    systemctl restart proxmox-backup-banner.service
+    sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    systemctl restart proxmox-backup-proxy.service
+
+  else
+    mv systemd/vmbanner-service /usr/bin/vmbanner
+    chmod +x /usr/bin/vmbanner
+    #chattr +i /usr/bin/vmbanner
+    cp systemd/vmbanner.service /lib/systemd/system/vmbanner.service
+    systemctl start vmbanner.service
+    systemctl enable vmbanner.service
+    /lib/systemd/system/vmbanner.service
+  fi
 }
 
 install_client_vpn() {
