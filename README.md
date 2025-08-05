@@ -72,9 +72,9 @@ pvesm set local-zfs --sparse 1
 
 ## TO-DO
 
-. Arreglar la zona horaria
-. Volver Generico <https://github.com/avillalba96/borg_config>
-. Implementar el script de forma generica <https://github.com/avillalba96/script-pve_cloudinit>
+1. Arreglar la zona horaria
+2. Volver Generico <https://github.com/avillalba96/borg_config>
+3. Implementar el script de forma generica <https://github.com/avillalba96/script-pve_cloudinit>
 
 ## Autores
 
