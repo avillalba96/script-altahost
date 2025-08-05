@@ -96,49 +96,31 @@ install_qemu() {
 }
 
 install_motd() {
-  if [[ $MOTDON -eq 0 ]]; then
-    cp images/proxmox_logo.png_example images/proxmox_logo.png
-    cp systemd/vmbanner-service_example systemd/vmbanner-service
-    cp systemd/pvebanner-service_example systemd/pvebanner-service
-    cp systemd/pbsbanner-service_example systemd/pbsbanner-service
-  fi
+    cp systemd/vmbanner-service_custom systemd/vmbanner-service
+    cp systemd/pvebanner-service_custom systemd/pvebanner-service
+    cp systemd/pbsbanner-service_custom systemd/pbsbanner-service
 
   if [[ $PROXMOX_YES -eq 1 ]]; then
     mv /usr/bin/pvebanner /usr/bin/pvebanner.bkp
     chmod -x /usr/bin/pvebanner.bkp
-    sed -i s/FECHA_ALTA/"$FECHA"/g systemd/pvebanner-service
     mv systemd/pvebanner-service /usr/bin/pvebanner
     chmod +x /usr/bin/pvebanner
     #chattr +i /usr/bin/pvebanner
     systemctl restart pvebanner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-
-    if [[ $MOTDON -ne 1 ]]; then
-      sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-    fi
-
-    cp images/proxmox_logo.png /usr/share/pve-manager/images/.
     systemctl restart pveproxy.service
 
   elif [[ $PROXMOX_BACKUP_YES -eq 1 ]]; then
     mv /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
     chmod -x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
-    sed -i s/FECHA_ALTA/"$FECHA"/g systemd/pbsbanner-service
     mv systemd/pbsbanner-service /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     #chattr +i /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     systemctl restart proxmox-backup-banner.service
     sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-
-    if [[ $MOTDON -ne 1 ]]; then
-      sed -i "s/www.proxmox.com/www.lunix.com.ar/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
-    fi
-
-    cp images/proxmox_logo.png /usr/share/javascript/proxmox-backup/images/.
     systemctl restart proxmox-backup-proxy.service
 
   else
-    sed -i s/FECHA_ALTA/"$FECHA"/g systemd/vmbanner-service
     mv systemd/vmbanner-service /usr/bin/vmbanner
     chmod +x /usr/bin/vmbanner
     #chattr +i /usr/bin/vmbanner
@@ -221,7 +203,7 @@ generate_user() {
 install_ssh() {
   #aptitude install -y geoip-bin geoip-database
   curl -Ls https://github.com/ipinfo/cli/releases/download/ipinfo-3.3.1/deb.sh | sh
-  sed -i s/VMLUNIX/"$HOST"/g /etc/ssh/*
+  sed -i s/VMALTAHOST/"$HOST"/g /etc/ssh/*
   cp hosts/hosts.allow /etc/hosts.allow
   cp hosts/hosts.deny /etc/hosts.deny
   sed -i "s/.*UseDNS\+.*/UseDNS no/" /etc/ssh/sshd_config
@@ -463,6 +445,14 @@ install_vm() {
   fi
 }
 
+install_wireguard() {
+  if [[ $WIREGUARDON -eq 1 ]]; then
+    wget https://raw.githubusercontent.com/avillalba96/mkt-wireguard_init/refs/heads/main/linux_install-client.sh -O /tmp/linux_install-client.sh
+    chmod +x /tmp/linux_install-client.sh
+    sudo /tmp/linux_install-client.sh
+  fi
+}
+
 finish_script() {
   sysctl --system
   apt-get autoremove && apt-get autoclean
@@ -505,7 +495,6 @@ finish_script() {
 init_script() {
   # Definimos carpeta del script sin importa de donde se llame
   DIRALTA="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  FECHA="$(date -I)"
 
   # Actualizamos los apt para la version de debian correspondiente
   NAMEHOST=$(lsb_release -ds)
@@ -517,7 +506,7 @@ init_script() {
   dialog --clear \
     --form "Completar datos del equipo cliente:" 25 60 16 \
     "Dominio del equipo: " 1 1 "dominio.com" 1 32 25 30 \
-    "Usuario generico: " 2 1 "lunix" 2 32 25 30 \
+    "Usuario generico: " 2 1 "altahost" 2 32 25 30 \
     "Puerto SSH: " 3 1 "23242" 3 32 25 30 \
     "Envio de email: " 4 1 "ing@example.com.ar" 4 32 25 30 \
     "Relayhost (Postfix): " 5 1 "172.26.0.1" 5 32 25 30 \
@@ -616,8 +605,8 @@ select_package_init() {
   cmd=(dialog --separate-output --checklist "Seleccionar paquetes a instalar:" 22 76 16)
   Opcions=(1 "Client - VPN (pfSense)" off
     2 "Client - ZABBIX (6.0)" off
-    3 "Client - BORG (Lunix SRL)" off
-    4 "Client - BANNER (Lunix SRL)" off)
+    3 "Client - BORG (CUSTOM)" off
+    4 "Client - WireGuard" off)
   choices=$("${cmd[@]}" "${Opcions[@]}" 2>&1 >/dev/tty)
   clear
   for choice in $choices; do
@@ -632,7 +621,7 @@ select_package_init() {
       BORGON=1
       ;;
     4)
-      MOTDON=1
+      WIREGUARDON=1
       ;;
     esac
   done
@@ -660,13 +649,14 @@ start_install() {
   install_ssh
   install_borg
   install_client_vpn
+  install_wireguard
   finish_script
 }
 
 prepare_system() {
   # Generamos flag de instalacion
-  mkdir /etc/lunix 2>/dev/null
-  echo "1" >/etc/lunix/alta_script
+  mkdir /etc/altahost 2>/dev/null
+  echo "1" >/etc/altahost/alta_script
 
   # Deshabilitamos IPV6
   echo -e "Acquire::ForceIPv4 \"true\";\\n" >/etc/apt/apt.conf.d/99-force-ipv4
@@ -684,7 +674,7 @@ prepare_system() {
     UBUNTUVERSION_YES=$(lsb_release -is | grep -ci "ubuntu")
 
     if [[ ("$DEBIANVERSION_YES" == 0) && ("$UBUNTUVERSION_YES" == 0) ]]; then
-      rm /etc/lunix/alta_script
+      rm /etc/altahost/alta_script
       clear
       echo -e "\e[0;31m[ERROR]: \e[0mNo se detecto SO compatible para este script\e[0m"
       exit
@@ -692,7 +682,7 @@ prepare_system() {
       start_install
     fi
   else
-    rm /etc/lunix/alta_script
+    rm /etc/altahost/alta_script
     clear
     echo -e "\e[0;31m[ERRO]: \e[0mSe cancelo la instalacion de SCRIPT ALTA\e[0m"
     exit
@@ -712,18 +702,18 @@ main() {
     QEMUON=0
     AMDFIXES=0
     KSMTUNED=0
-    MOTDON=0
+    WIREGUARDON=0
 
     # Iniciando instalacion
     clear
-    mkdir /var/log/lunix/
-    if [[ -f /etc/lunix/alta_script ]]; then
+    mkdir /var/log/altahost/
+    if [[ -f /etc/altahost/alta_script ]]; then
       echo -e "\e[0;31m[ERROR]: \e[0mEl equipo ya se encuentra dado de alta\e[0m"
       exit
     fi
     ( (
       prepare_system
-    ) 2>&1) | tee /var/log/lunix/alta_lunix.log
+    ) 2>&1) | tee /var/log/altahost/alta_altahost.log
   fi
 }
 

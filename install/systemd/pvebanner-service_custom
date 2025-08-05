@@ -1,10 +1,12 @@
-#!/usr/bin/perl
+ #!/usr/bin/perl
 
 use strict;
+use PVE::INotify;
+use PVE::Cluster;
 
-my $localip = join('',split(/\n/,qx(ip a | grep inet | grep -v inet6 | grep -v 127.0.0.1 | head -n1 | awk -F'[/ ]+' '{print $3}')));
-my $vmversion = join('',split(/\n/,qx(lsb_release -ds)));
-my $namehost = join('',split(/\n/,qx(hostname -s)));
+my $nodename = PVE::INotify::nodename();
+my $localip = PVE::Cluster::remote_node_ip($nodename, 1);
+my $pveversion = join('',split(/\n/,qx(pveversion | awk -F"[/ /]+" "{print \\\$2}")));
 my $domain = join('',split(/\n/,qx(hostname -d)));
 
 my $xline = '-' x 78;
@@ -16,9 +18,10 @@ if ($localip) {
 
 \e[1;31m
  -----------------------------------------------------
-               #####  ${vmversion} #####
+               #####  PROXMOX v${pveversion} #####
 \e[1;32m
-                ${namehost}.${domain}
+                ${nodename}.${domain}
+LOCAL: 	    https://${localip}:8006/
  -----------------------------------------------------
 \e[0m
 
