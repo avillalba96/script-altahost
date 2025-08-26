@@ -75,6 +75,7 @@ pvesm set local-zfs --sparse 1
 1. Arreglar la zona horaria
 2. Volver Generico <https://github.com/avillalba96/borg_config>
 3. Implementar el script de forma generica <https://github.com/avillalba96/script-pve_cloudinit>
+4. Actualizar todos los paquetes> zabbix, borg, etc etc
 
 ## Autores
 
