@@ -568,6 +568,7 @@ init_script() {
   cp systemd/timesyncd.conf /etc/systemd/timesyncd.conf
   timedatectl set-ntp true
   systemctl restart systemd-timesyncd.service
+  timedatectl set-timezone America/Argentina/Buenos_Aires
 
   # Personalizacion
   cp vim/vimrc /root/.vimrc
