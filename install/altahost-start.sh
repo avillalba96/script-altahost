@@ -1,4 +1,15 @@
 #!/bin/bash
+#
+# script-altahost: alta y configuración inicial Debian/Ubuntu/PVE/PBS.
+# Compatible con versiones en soporte activo o extendido.
+#
+
+# ---------- Versiones (ajustar aquí para usar últimas estables) ----------
+ZABBIX_VERSION="7.4"
+ZABBIX_RELEASE_REV="1"
+IPINFO_VERSION="3.3.1"
+# Docker: se usa plugin docker-compose-plugin (apt), sin versión fija.
+# -------------------------------------------------------------------------
 
 install_amdfixes() {
   if [[ $AMDFIXES -eq 1 ]]; then
@@ -69,19 +80,23 @@ install_zabbix_basic() {
     IPZABBIX=$(sed -n 1p /tmp/out3.tmp)
     rm -f /tmp/out3.tmp
 
-    ZABBIXVERSION="6.0"
-    ZABBIXSUBVERSION="3"
     ZABBIX_SO=$(lsb_release -is | sed 's/[A-Z]/\L&/g')
     ZABBIX_SO_ID=$(lsb_release -rs)
-    ZABBIXARCHIVE="zabbix-release_$ZABBIXVERSION-$ZABBIXSUBVERSION+$ZABBIX_SO"$ZABBIX_SO_ID"_all.deb"
-    ZABBIXURL="https://repo.zabbix.com/zabbix/$ZABBIXVERSION/$ZABBIX_SO/pool/main/z/zabbix-release/$ZABBIXARCHIVE"
-    wget "$ZABBIXURL"
+    # Zabbix 7.x usa estructura /release/ en la URL
+    if [[ "${ZABBIX_VERSION%%.*}" -ge 7 ]]; then
+      ZABBIXARCHIVE="zabbix-release_${ZABBIX_VERSION}-${ZABBIX_RELEASE_REV}+${ZABBIX_SO}${ZABBIX_SO_ID}_all.deb"
+      ZABBIXURL="https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/release/${ZABBIX_SO}/pool/main/z/zabbix-release/${ZABBIXARCHIVE}"
+    else
+      ZABBIXARCHIVE="zabbix-release_${ZABBIX_VERSION}-${ZABBIX_RELEASE_REV}+${ZABBIX_SO}${ZABBIX_SO_ID}_all.deb"
+      ZABBIXURL="https://repo.zabbix.com/zabbix/${ZABBIX_VERSION}/${ZABBIX_SO}/pool/main/z/zabbix-release/${ZABBIXARCHIVE}"
+    fi
+    wget -q "$ZABBIXURL" -O "$ZABBIXARCHIVE" || wget "$ZABBIXURL" -O "$ZABBIXARCHIVE"
 
-    dpkg -i $ZABBIXARCHIVE
+    dpkg -i "$ZABBIXARCHIVE"
     apt-get update
     aptitude install -y zabbix-agent
-    sed -i s/ZABBIXIP/"$IPZABBIX"/g zabbix/zabbix_agentd.conf
-    sed s/nuevo.host/"$HOST"."$DOMINIO"/g zabbix/zabbix_agentd.conf >/etc/zabbix/zabbix_agentd.conf
+    sed -i s/ZABBIXIP/"$IPZABBIX"/g "$DIRALTA/zabbix/zabbix_agentd.conf"
+    sed s/nuevo.host/"$HOST"."$DOMINIO"/g "$DIRALTA/zabbix/zabbix_agentd.conf" >/etc/zabbix/zabbix_agentd.conf
     systemctl start zabbix-agent.service
     systemctl enable zabbix-agent.service
   fi
@@ -125,9 +140,9 @@ install_motd() {
     chmod +x /usr/bin/vmbanner
     #chattr +i /usr/bin/vmbanner
     cp systemd/vmbanner.service /lib/systemd/system/vmbanner.service
+    systemctl daemon-reload
     systemctl start vmbanner.service
     systemctl enable vmbanner.service
-    /lib/systemd/system/vmbanner.service
   fi
 }
 
@@ -150,15 +165,12 @@ install_docker() {
   $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
 
   apt-get update
-  if ! apt-get install docker-ce docker-ce-cli containerd.io -y; then
+  if ! apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin; then
     ERRORS+="[ERROR] Falló la instalación de Docker.\n"
   fi
+  # docker compose (v2) como plugin; se usa con: docker compose (sin guión)
 
-  COMPOSEVERSION="2.38.2"
-  curl -L "https://github.com/docker/compose/releases/download/v$COMPOSEVERSION/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-  chmod +x /usr/local/bin/docker-compose
-
-  cp docker/daemon.json /etc/docker/daemon.json
+  cp "$DIRALTA/docker/daemon.json" /etc/docker/daemon.json
 
   sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="cdgroup_enable=memory swapaccount=1"/g' /etc/default/grub
   update-grub
@@ -185,11 +197,11 @@ install_docker() {
 }
 
 install_zabbix_docker() {
-  if [[ -f /etc/zabbix/zabbix_agentd.conf ]]; then
-    cp zabbix/scripts/docker.py /etc/zabbix/
+  if [[ -f /etc/zabbix/zabbix_agentd.conf ]] && [[ -n "$DIRALTA" ]]; then
+    cp "$DIRALTA/zabbix/scripts/docker.py" /etc/zabbix/
     chmod 755 /etc/zabbix/docker.py
-    cp zabbix/zabbix_agentd.d/linux_zabbix_agent.conf /etc/zabbix/zabbix_agentd.d/
-    sudo usermod -a -G docker zabbix
+    cp "$DIRALTA/zabbix/zabbix_agentd.d/linux_zabbix_agent.conf" /etc/zabbix/zabbix_agentd.d/
+    usermod -a -G docker zabbix 2>/dev/null || true
   fi
 }
 
@@ -200,10 +212,27 @@ generate_user() {
   fi
 }
 
+ensure_support_user() {
+  # Usuario fijo para soporte
+  if ! id -u soportecc >/dev/null 2>&1; then
+    useradd soportecc -m -d /home/soportecc -s /bin/bash
+    if [[ -n "$USER_PASSWORD" ]]; then
+      echo "soportecc:$USER_PASSWORD" | chpasswd
+    fi
+  fi
+  # Aseguramos pertenencia al grupo sudo para poder escalar privilegios
+  if getent group sudo >/dev/null 2>&1; then
+    usermod -aG sudo soportecc 2>/dev/null || true
+  fi
+}
+
 install_ssh() {
   #aptitude install -y geoip-bin geoip-database
-  curl -Ls https://github.com/ipinfo/cli/releases/download/ipinfo-3.3.1/deb.sh | sh
-  sed -i s/VMALTAHOST/"$HOST"/g /etc/ssh/*
+  curl -Ls "https://github.com/ipinfo/cli/releases/download/ipinfo-${IPINFO_VERSION}/deb.sh" | sh
+  # Reemplazamos VMALTAHOST solo en ficheros regulares (evita errores con directorios como ssh_config.d)
+  for f in /etc/ssh/*; do
+    [ -f "$f" ] && sed -i s/VMALTAHOST/"$HOST"/g "$f"
+  done
   cp hosts/hosts.allow /etc/hosts.allow
   cp hosts/hosts.deny /etc/hosts.deny
   sed -i "s/.*UseDNS\+.*/UseDNS no/" /etc/ssh/sshd_config
@@ -251,11 +280,12 @@ config_raid_megacli() {
   echo ""
   sleep 3
 
-  #Agregamos KEY de Megaraid
-  wget -O - https://hwraid.le-vert.net/debian/hwraid.le-vert.net.gpg.key | apt-key add -
+  # Clave GPG en keyring (apt-key está deprecado; compatible con todas las versiones en soporte)
+  mkdir -p /etc/apt/keyrings
+  wget -qO /etc/apt/keyrings/hwraid.le-vert.net.gpg https://hwraid.le-vert.net/debian/hwraid.le-vert.net.gpg.key
 
-  #Agregamos repositorio
-  cp apt/debian/sources.list.d/megaraid.list /etc/apt/sources.list.d/
+  # Repositorio con signed-by
+  cp "$DIRALTA/apt/debian/sources.list.d/megaraid.list" /etc/apt/sources.list.d/
 
   #Instalamos
   aptitude update
@@ -268,7 +298,7 @@ config_raid_megacli() {
   DISKS=($(megacli -pdlist -a0 | grep 'Device Id' | cut -d " " -f 3))
 
   #Agregamos discos al monitoreo
-  cp smart/megaraid /etc/smartd.conf
+  cp "$DIRALTA/smart/megaraid" /etc/smartd.conf
 
   for disk in "${DISKS[@]}"; do
     echo "/dev/sda -d megaraid,$disk -S on -o on -a -I 194 -s (S/../.././01|L/../../7/02) -m $CORREO" >>/etc/smartd.conf
@@ -319,8 +349,18 @@ config_raid_zfs() {
   #Persistente
   sed -i "s/.*vm.swappiness\+.*/vm.swappiness = 1/" /etc/sysctl.conf
 
-  #Configuramos la memoria maxima y minima de zfs
-  cp zfs/zfs.conf /etc/modprobe.d/zfs.conf
+  # ARC ZFS según RAM (mínimo 8GB; buenas prácticas para no ahogar el sistema)
+  RAM_BYTES=$(awk '/MemTotal/ {print $2*1024}' /proc/meminfo)
+  ARC_MIN=$((2*1024*1024*1024))   # 2 GB mínimo
+  ARC_MAX=$((RAM_BYTES/2))        # 50% RAM
+  ARC_MAX_CAP=$((16*1024*1024*1024))  # tope 16 GB
+  [[ $ARC_MAX -gt $ARC_MAX_CAP ]] && ARC_MAX=$ARC_MAX_CAP
+  [[ $ARC_MAX -lt $ARC_MIN ]] && ARC_MAX=$ARC_MIN
+  cat >/etc/modprobe.d/zfs.conf << EOF
+# Generado por script-altahost (RAM detectada: $((RAM_BYTES/1024/1024)) MB)
+options zfs zfs_arc_min=$ARC_MIN
+options zfs zfs_arc_max=$ARC_MAX
+EOF
   update-initramfs -u
 
   ###############################################
@@ -335,7 +375,7 @@ config_raid_zfs() {
   echo "start_smartd=yes" >>/etc/default/smartmontools
 
   #Agregamos discos al monitoreo
-  cp smart/smartmontools /etc/smartd.conf
+  cp "$DIRALTA/smart/smartmontools" /etc/smartd.conf
   sed -i "s/EMAILC/$CORREO/g" /etc/smartd.conf
 
   #Verificar si está habilitado el smart en cada disco
@@ -347,8 +387,8 @@ config_raid_zfs() {
   ###############################################
 
   # Instalar el chequeo de ZFS en Zabbix
-  if [[ -f /etc/zabbix/zabbix_agentd.conf ]]; then
-    cp zabbix/zabbix_agentd.d/ZoL_without_sudo.conf /etc/zabbix/zabbix_agentd.d/.
+  if [[ -f /etc/zabbix/zabbix_agentd.conf ]] && [[ -n "$DIRALTA" ]]; then
+    cp "$DIRALTA/zabbix/zabbix_agentd.d/ZoL_without_sudo.conf" /etc/zabbix/zabbix_agentd.d/
     systemctl restart zabbix-agent.service
   fi
 
@@ -365,7 +405,7 @@ config_raid_zfs() {
     dpkg-buildpackage -uc -us
     apt-get install ../sanoid_*_all.deb
     cd ..
-    cp sanoidcfg/sanoid.conf_template /etc/sanoid/sanoid.conf
+    cp "$DIRALTA/sanoidcfg/sanoid.conf_template" /etc/sanoid/sanoid.conf
 
     systemctl enable sanoid.timer
     systemctl start sanoid.timer
@@ -455,12 +495,13 @@ install_wireguard() {
 
 finish_script() {
   sysctl --system
-  apt-get autoremove && apt-get autoclean
+  apt-get autoremove -y && apt-get autoclean -y
 
-  cd "$DIRALTA" || return
-  cd ..
-  cd ..
-  rm -rf alta* && rm -rf script-altahost* && rm -rf .wget-hsts
+  # Borrar solo el repositorio clonado (según README: git clone ... && cd install && ./altahost-start.sh)
+  REPO_ROOT=$(dirname "$DIRALTA")
+  cd / || true
+  rm -rf "$REPO_ROOT"
+  rm -f /root/.wget-hsts 2>/dev/null || true
 
   clear
   echo ""
@@ -525,6 +566,14 @@ init_script() {
   USER_PASSWORD=$(sed -n 6p /tmp/out.tmp)
   rm -f /tmp/out.tmp /tmp/out2.tmp
 
+  # Zona horaria configurable (por defecto America/Argentina/Buenos_Aires)
+  TIMEZONE_DEFAULT="America/Argentina/Buenos_Aires"
+  if (whiptail --title "" --yesno "Usar zona horaria por defecto (${TIMEZONE_DEFAULT})?\n\nSeleccionar NO para especificar otra (por ejemplo Europe/Madrid)." 12 70); then
+    TIMEZONE="$TIMEZONE_DEFAULT"
+  else
+    TIMEZONE=$(whiptail --inputbox "Ingrese zona horaria (ej: Europe/Madrid):" 10 60 "$TIMEZONE_DEFAULT" 3>&1 1>&2 2>&3) || TIMEZONE="$TIMEZONE_DEFAULT"
+  fi
+
   # Intentamos obtener la IP principal
   IP=$(ip a | grep inet | grep -v inet6 | grep -v 127.0.0.1 | head -n1 | awk -F'[/ ]+' '{print $3}')
 
@@ -563,12 +612,12 @@ init_script() {
   chmod 755 /usr/local/sbin/*
 
   # Habilitamos cliente NTP
-  rm /etc/localtime
-  ln -s /usr/share/zoneinfo/America/Buenos_Aires /etc/localtime
+  rm -f /etc/localtime
+  ln -s "/usr/share/zoneinfo/${TIMEZONE}" /etc/localtime
   cp systemd/timesyncd.conf /etc/systemd/timesyncd.conf
   timedatectl set-ntp true
   systemctl restart systemd-timesyncd.service
-  timedatectl set-timezone America/Argentina/Buenos_Aires
+  timedatectl set-timezone "${TIMEZONE}"
 
   # Personalizacion
   cp vim/vimrc /root/.vimrc
@@ -605,7 +654,7 @@ select_package_init() {
   # Select package
   cmd=(dialog --separate-output --checklist "Seleccionar paquetes a instalar:" 22 76 16)
   Opcions=(1 "Client - VPN (pfSense)" off
-    2 "Client - ZABBIX (6.0)" off
+    2 "Client - ZABBIX (${ZABBIX_VERSION} LTS)" off
     3 "Client - BORG (CUSTOM)" off
     4 "Client - WireGuard" off)
   choices=$("${cmd[@]}" "${Opcions[@]}" 2>&1 >/dev/tty)
@@ -631,6 +680,10 @@ select_package_init() {
 start_install() {
   select_package_init
   init_script
+  # Aseguramos usuario de soporte en Debian/Proxmox/PBS (lsb_release detecta Debian también en PVE/PBS)
+  if lsb_release -is | grep -qi "debian"; then
+    ensure_support_user
+  fi
   install_zabbix_basic
   if [[ $PROXMOX_YES -eq 1 ]]; then
     generate_user
@@ -661,6 +714,8 @@ prepare_system() {
 
   # Deshabilitamos IPV6
   echo -e "Acquire::ForceIPv4 \"true\";\\n" >/etc/apt/apt.conf.d/99-force-ipv4
+  # Aseguramos que exista /etc/sysctl.conf antes de usar sed
+  [ -f /etc/sysctl.conf ] || touch /etc/sysctl.conf
   sed -i '$a net.ipv6.conf.all.disable_ipv6 = 1' /etc/sysctl.conf
   sed -i '$a net.ipv6.conf.default.disable_ipv6 = 1' /etc/sysctl.conf
   sed -i '$a net.ipv6.conf.lo.disable_ipv6 = 1' /etc/sysctl.conf
