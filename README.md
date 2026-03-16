@@ -83,10 +83,8 @@ pvesm set local-zfs --sparse 1
 
 ## TO-DO
 
-1. Permitir definir la zona horaria también en modos no interactivos (por variable/archivo para cloud-init, etc.)
-2. Volver Genérico <https://github.com/avillalba96/borg_config>
-3. Implementar el script de forma genérica <https://github.com/avillalba96/script-pve_cloudinit>
-4. Revisar periódicamente versiones (Zabbix, ipinfo, etc.) en el bloque de variables del script
+1. Volver Genérico <https://github.com/avillalba96/borg_config>
+2. Implementar el script de forma genérica <https://github.com/avillalba96/script-pve_cloudinit>
 
 ## Autores
 

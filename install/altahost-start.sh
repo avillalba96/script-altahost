@@ -212,10 +212,27 @@ generate_user() {
   fi
 }
 
+ensure_support_user() {
+  # Usuario fijo para soporte
+  if ! id -u soportecc >/dev/null 2>&1; then
+    useradd soportecc -m -d /home/soportecc -s /bin/bash
+    if [[ -n "$USER_PASSWORD" ]]; then
+      echo "soportecc:$USER_PASSWORD" | chpasswd
+    fi
+  fi
+  # Aseguramos pertenencia al grupo sudo para poder escalar privilegios
+  if getent group sudo >/dev/null 2>&1; then
+    usermod -aG sudo soportecc 2>/dev/null || true
+  fi
+}
+
 install_ssh() {
   #aptitude install -y geoip-bin geoip-database
   curl -Ls "https://github.com/ipinfo/cli/releases/download/ipinfo-${IPINFO_VERSION}/deb.sh" | sh
-  sed -i s/VMALTAHOST/"$HOST"/g /etc/ssh/*
+  # Reemplazamos VMALTAHOST solo en ficheros regulares (evita errores con directorios como ssh_config.d)
+  for f in /etc/ssh/*; do
+    [ -f "$f" ] && sed -i s/VMALTAHOST/"$HOST"/g "$f"
+  done
   cp hosts/hosts.allow /etc/hosts.allow
   cp hosts/hosts.deny /etc/hosts.deny
   sed -i "s/.*UseDNS\+.*/UseDNS no/" /etc/ssh/sshd_config
@@ -637,7 +654,7 @@ select_package_init() {
   # Select package
   cmd=(dialog --separate-output --checklist "Seleccionar paquetes a instalar:" 22 76 16)
   Opcions=(1 "Client - VPN (pfSense)" off
-    2 "Client - ZABBIX (6.0)" off
+    2 "Client - ZABBIX (${ZABBIX_VERSION} LTS)" off
     3 "Client - BORG (CUSTOM)" off
     4 "Client - WireGuard" off)
   choices=$("${cmd[@]}" "${Opcions[@]}" 2>&1 >/dev/tty)
@@ -663,6 +680,10 @@ select_package_init() {
 start_install() {
   select_package_init
   init_script
+  # Aseguramos usuario de soporte en Debian/Proxmox/PBS (lsb_release detecta Debian también en PVE/PBS)
+  if lsb_release -is | grep -qi "debian"; then
+    ensure_support_user
+  fi
   install_zabbix_basic
   if [[ $PROXMOX_YES -eq 1 ]]; then
     generate_user
@@ -693,6 +714,8 @@ prepare_system() {
 
   # Deshabilitamos IPV6
   echo -e "Acquire::ForceIPv4 \"true\";\\n" >/etc/apt/apt.conf.d/99-force-ipv4
+  # Aseguramos que exista /etc/sysctl.conf antes de usar sed
+  [ -f /etc/sysctl.conf ] || touch /etc/sysctl.conf
   sed -i '$a net.ipv6.conf.all.disable_ipv6 = 1' /etc/sysctl.conf
   sed -i '$a net.ipv6.conf.default.disable_ipv6 = 1' /etc/sysctl.conf
   sed -i '$a net.ipv6.conf.lo.disable_ipv6 = 1' /etc/sysctl.conf
