@@ -2,17 +2,25 @@
 
 Script para automatizar el alta y configuración inicial de servidores UBUNTU/DEBIAN/PVE/PBS para proyectos CUSTOM o cualquier cliente.
 
+El script está pensado para **todas las versiones en soporte activo o extendido** de las distros indicadas. Se evitan dependencias deprecadas (p. ej. `apt-key`) y se usan versiones actuales de Zabbix LTS, Docker Compose (plugin), etc.
+
 ## Compatibilidad
 
-- Cloud/Debian9+
-- Cloud/Ubuntu20.04+
-- Ubuntu+Docker
-- PVE v6+
-- PBS v1+
+| Entorno        | Versiones objetivo (soporte activo/extendido) |
+|----------------|------------------------------------------------|
+| Debian         | 11, 12, 13                                    |
+| Ubuntu         | 20.04, 22.04, 24.04                           |
+| Proxmox VE     | 7, 8                                          |
+| Proxmox Backup | 2, 3                                          |
+| Docker         | Solo Ubuntu (según README)                     |
+
+- Cloud/Debian y Cloud/Ubuntu en las versiones anteriores.
+- Ubuntu + Docker: instalación opcional de Docker + plugin Compose.
+- PVE/PBS: repos enterprise y no-subscription; fail2ban, ZFS, etc.
 
 ## Instalación
 
-1. Instala dependencias:
+1. Instala dependencias básicas:
 
    ```bash
    apt-get update; apt-get install -y git screen
@@ -24,7 +32,7 @@ Script para automatizar el alta y configuración inicial de servidores UBUNTU/DE
    screen
    ```
 
-3. Clona y ejecuta el script:
+3. Clona y ejecuta el script (en una VM recién instalada si es posible):
 
    ```bash
    git clone https://github.com/avillalba96/script-altahost && cd script-altahost/install && ./altahost-start.sh
@@ -33,9 +41,12 @@ Script para automatizar el alta y configuración inicial de servidores UBUNTU/DE
 ## Funcionalidades principales
 
 - Configuración automática de SSH, banners, usuarios y servicios básicos.
-- Instalación opcional de Zabbix, WireGuard, Docker, etc.
+- Filtro SSH por país con **ipinfo** (IPv4 e IPv6; sin geoip por compatibilidad en Ubuntu 24 / Debian 13).
+- Instalación opcional de Zabbix (7.4 LTS), WireGuard, Docker + Compose plugin, Borg, etc.
 - Personalización de banners de bienvenida (MOTD) genéricos.
-- Soporte para RAID ZFS (comandos útiles incluidos).
+- Soporte para RAID ZFS (ARC generado según RAM; buenas prácticas para equipos con al menos 8 GB).
+- MegaRAID: repositorio con keyring `signed-by` (sin `apt-key` deprecado).
+ - Zona horaria configurable vía menú (por defecto `America/Argentina/Buenos_Aires`).
 
 ## Personalización de banners y logo
 
@@ -59,7 +70,7 @@ wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/
 
 ### RAID ZFS (configuracion basica, machete)
 
-Se deja a mano los comandos aplicados sobre local-zfs
+Se deja a mano los comandos aplicados sobre local-zfs. El script ya aplica ARC según RAM (2 GB mín, 50 % máx, tope 16 GB).
 
 ```bash
 zfs set reservation=20G rpool/ROOT
@@ -72,10 +83,10 @@ pvesm set local-zfs --sparse 1
 
 ## TO-DO
 
-1. Arreglar la zona horaria
-2. Volver Generico <https://github.com/avillalba96/borg_config>
-3. Implementar el script de forma generica <https://github.com/avillalba96/script-pve_cloudinit>
-4. Actualizar todos los paquetes> zabbix, borg, etc etc
+1. Permitir definir la zona horaria también en modos no interactivos (por variable/archivo para cloud-init, etc.)
+2. Volver Genérico <https://github.com/avillalba96/borg_config>
+3. Implementar el script de forma genérica <https://github.com/avillalba96/script-pve_cloudinit>
+4. Revisar periódicamente versiones (Zabbix, ipinfo, etc.) en el bloque de variables del script
 
 ## Autores
 
