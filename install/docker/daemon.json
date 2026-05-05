@@ -1,15 +1,19 @@
 {
     "default-address-pools": [
-      {
-        "base": "10.88.0.0/16",
-        "size": 24
-      }
+      { "base": "10.88.0.0/16", "size": 24 }
     ],
     "userns-remap": "default",
     "log-driver": "json-file",
     "log-opts": {
       "max-size": "100m",
       "max-file": "3"
+    },
+    "no-new-privileges": true,
+    "icc": false,
+    "live-restore": true,
+    "userland-proxy": false,
+    "default-ulimits": {
+      "nofile": { "Name": "nofile", "Soft": 1024, "Hard": 524288 },
+      "nproc":  { "Name": "nproc",  "Soft": 2048, "Hard": 2048  }
     }
-  }
-  
+}
