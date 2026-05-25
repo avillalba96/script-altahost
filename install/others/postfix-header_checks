@@ -1,0 +1,2 @@
+# From visible: root <HOST@DOMINIO> (sustituido por altahost-start.sh)
+/^From:.*$/ REPLACE From: root <MAIL_FROM>

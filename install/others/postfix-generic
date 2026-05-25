@@ -1,0 +1,9 @@
+# Remitente saliente HOST@DOMINIO (sustituido por altahost-start.sh)
+HOST MAIL_FROM
+root MAIL_FROM
+root@HOST MAIL_FROM
+@HOST MAIL_FROM
+@FQDN MAIL_FROM
+@localhost MAIL_FROM
+@localhost.localdomain MAIL_FROM
+@DOMINIO MAIL_FROM

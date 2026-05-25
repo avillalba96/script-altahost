@@ -5,5 +5,4 @@ webmaster: root
 www: root
 
 ##
-root: useremail
-useremail: EMAILC
+root: EMAILC

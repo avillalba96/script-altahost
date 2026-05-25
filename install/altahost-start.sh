@@ -549,22 +549,24 @@ init_script() {
     "Dominio del equipo: " 1 1 "dominio.com" 1 32 25 30 \
     "Usuario generico: " 2 1 "altahost" 2 32 25 30 \
     "Puerto SSH: " 3 1 "23242" 3 32 25 30 \
-    "Envio de email: " 4 1 "ing@example.com.ar" 4 32 25 30 \
-    "Relayhost (Postfix): " 5 1 "172.26.0.1" 5 32 25 30 \
+    "Correo alertas (aliases): " 4 1 "ing@example.com.ar" 4 32 25 30 \
+    "Relayhost (vacio=MX directo): " 5 1 "172.26.0.1" 5 32 25 30 \
     --insecure --passwordbox "Contrasena del usuario:" 6 50 >/tmp/out.tmp \
     2>&1 >/dev/tty
 
   cp /tmp/out.tmp /var/log/out.tmp #TEMPORAL
-  tr -d " \t" </tmp/out.tmp >/tmp/out2.tmp
-  grep "\S" /tmp/out2.tmp >/tmp/out.tmp
-
-  DOMINIO=$(sed -n 1p /tmp/out.tmp)
-  GENERIC_USER=$(sed -n 2p /tmp/out.tmp)
-  SSH_PORT=$(sed -n 3p /tmp/out.tmp)
-  CORREO=$(sed -n 4p /tmp/out.tmp)
-  IPCORREO=$(sed -n 5p /tmp/out.tmp)
-  USER_PASSWORD=$(sed -n 6p /tmp/out.tmp)
+  tr -d '\r' </tmp/out.tmp >/tmp/out2.tmp
+  # No eliminar lineas vacias: relayhost vacio debe conservar la linea 5
+  DOMINIO=$(sed -n '1p' /tmp/out2.tmp | tr -d ' \t')
+  GENERIC_USER=$(sed -n '2p' /tmp/out2.tmp | tr -d ' \t')
+  SSH_PORT=$(sed -n '3p' /tmp/out2.tmp | tr -d ' \t')
+  CORREO=$(sed -n '4p' /tmp/out2.tmp | tr -d ' \t')
+  IPCORREO=$(sed -n '5p' /tmp/out2.tmp | tr -d ' \t')
+  USER_PASSWORD=$(sed -n '6p' /tmp/out2.tmp | tr -d ' \t')
   rm -f /tmp/out.tmp /tmp/out2.tmp
+
+  FQDN="${HOST}.${DOMINIO}"
+  MAIL_FROM="${HOST}@${DOMINIO}"
 
   # Zona horaria configurable (por defecto America/Argentina/Buenos_Aires)
   TIMEZONE_DEFAULT="America/Argentina/Buenos_Aires"
@@ -628,15 +630,33 @@ init_script() {
   aptitude install -y fail2ban
   sed '/logtarget =/c\logtarget = SYSLOG' -i /etc/fail2ban/fail2ban.conf
   sed -i "s/destemail = root@localhost/destemail = $CORREO/g" /etc/fail2ban/jail.conf
-  sed -i "s/sender = root@<fq-hostname>/sender = root@$HOST.$DOMINIO/g" /etc/fail2ban/jail.conf
+  sed -i "s/sender = root@<fq-hostname>/sender = $MAIL_FROM/g" /etc/fail2ban/jail.conf
   #  sed -i "s/action = %(action_)s/action = %(action_mw)s/g" /etc/fail2ban/jail.conf
   systemctl reload fail2ban.service
 
-  # Configuramos Postfix
+  # Configuramos Postfix (origen HOST@DOMINIO; relayhost opcional)
+  export DEBIAN_FRONTEND=noninteractive
   aptitude install -y postfix mailutils
+  echo "$DOMINIO" >/etc/mailname
   cp others/aliases /etc/aliases
   sed -i "s/EMAILC/$CORREO/g" /etc/aliases
-  postconf -e "relayhost = $IPCORREO"
+  sed -e "s/HOST/$HOST/g" -e "s/DOMINIO/$DOMINIO/g" -e "s/FQDN/$FQDN/g" \
+    -e "s/MAIL_FROM/$MAIL_FROM/g" others/postfix-generic >/etc/postfix/generic
+  sed -e "s/EMAILC/$CORREO/g" -e "s/DOMINIO/$DOMINIO/g" others/postfix-virtual >/etc/postfix/virtual
+  sed -e "s/MAIL_FROM/$MAIL_FROM/g" others/postfix-header_checks >/etc/postfix/header_checks
+  postmap /etc/postfix/generic
+  postmap /etc/postfix/virtual
+  postconf -e "myhostname = $FQDN"
+  postconf -e "myorigin = $DOMINIO"
+  postconf -e "smtp_generic_maps = hash:/etc/postfix/generic"
+  postconf -e "smtp_header_checks = regexp:/etc/postfix/header_checks"
+  postconf -e "virtual_alias_maps = hash:/etc/postfix/virtual"
+  if [[ -n "$IPCORREO" ]]; then
+    postconf -e "relayhost = $IPCORREO"
+  else
+    postconf -e "relayhost ="
+  fi
+  postfix check
   systemctl restart postfix.service
   newaliases
 

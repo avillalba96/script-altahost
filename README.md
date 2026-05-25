@@ -47,6 +47,7 @@ El script está pensado para **todas las versiones en soporte activo o extendido
 - Soporte para RAID ZFS (ARC generado según RAM; buenas prácticas para equipos con al menos 8 GB).
 - MegaRAID: repositorio con keyring `signed-by` (sin `apt-key` deprecado).
  - Zona horaria configurable vía menú (por defecto `America/Argentina/Buenos_Aires`).
+- Postfix: remitente saliente `hostname@dominio`, cabecera From `root <hostname@dominio>`, relayhost opcional (vacío = MX directo), correo de alertas vía aliases y virtual.
 
 ## Personalización de banners y logo
 
