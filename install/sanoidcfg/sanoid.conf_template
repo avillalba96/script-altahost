@@ -1,27 +1,28 @@
-#################### 
-# sanoid.conf file # 
+####################
+# sanoid.conf file #
 ####################
 
+# Snapshot policy for Proxmox VM datasets under rpool/data
 [rpool/data]
         use_template = proxbase
         recursive = yes
         process_children_only = yes
 
-############################# 
-# templates below this line # 
+#############################
+# templates below this line #
 #############################
 
 [template_proxbase]
         frequently = 0
-        # Snapshots cada 1 hora
+        # Keep this many hourly snapshots
         hourly = 6
-        # Snapshots diarios
+        # Keep this many daily snapshots
         daily = 7
-        # Snapshots mensuales
+        # Keep this many monthly snapshots
         monthly = 0
-        # Snapshots anuales
+        # Keep this many yearly snapshots
         yearly = 0
-        # create new snapshots 
+        # create new snapshots
         autosnap = yes
-        # clean old snapshot 
+        # prune old snapshots
         autoprune = yes

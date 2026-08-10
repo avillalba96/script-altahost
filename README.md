@@ -1,77 +1,87 @@
 # script-altahost
 
-Script para automatizar el alta y configuración inicial de servidores UBUNTU/DEBIAN/PVE/PBS para proyectos CUSTOM o cualquier cliente.
+Post-install bootstrap for **Debian**, **Ubuntu**, **Proxmox VE** and **Proxmox Backup Server**.
 
-El script está pensado para **todas las versiones en soporte activo o extendido** de las distros indicadas. Se evitan dependencias deprecadas (p. ej. `apt-key`) y se usan versiones actuales de Zabbix LTS, Docker Compose (plugin), etc.
+One public script for VMs and hypervisors. Targets **currently supported** releases (`+` = from that baseline up to whatever is current when you run it). MIT licensed — use and adapt freely.
 
-## Compatibilidad
+## Compatibility
 
-| Entorno        | Versiones objetivo (soporte activo/extendido) |
-|----------------|------------------------------------------------|
-| Debian         | 11, 12, 13                                    |
-| Ubuntu         | 20.04, 22.04, 24.04                           |
-| Proxmox VE     | 7, 8                                          |
-| Proxmox Backup | 2, 3                                          |
-| Docker         | Solo Ubuntu (según README)                     |
+Same entrypoint for all platforms: `install/altahost-start.sh`
 
-- Cloud/Debian y Cloud/Ubuntu en las versiones anteriores.
-- Ubuntu + Docker: instalación opcional de Docker + plugin Compose.
-- PVE/PBS: repos enterprise y no-subscription; fail2ban, ZFS, etc.
+| Platform | Supported line |
+|----------|----------------|
+| **Debian** | 11 **+** (11, 12, 13, … current in support) |
+| **Ubuntu** | 20.04 **+** (20.04, 22.04, 24.04, … current LTS in support) |
+| **Proxmox VE** | **7 +** (7, 8, 9, … current) |
+| **Proxmox Backup** | **2 +** (2, 3, … current) |
+| **Docker** (optional) | Ubuntu only |
 
-## Instalación
+The script detects the host type and applies the matching branch.
 
-1. Instala dependencias básicas:
-
-   ```bash
-   apt-get update; apt-get install -y git screen
-   ```
-
-2. Ejecuta en una terminal con screen:
-
-   ```bash
-   screen
-   ```
-
-3. Clona y ejecuta el script (en una VM recién instalada si es posible):
-
-   ```bash
-   git clone https://github.com/avillalba96/script-altahost && cd script-altahost/install && ./altahost-start.sh
-   ```
-
-## Funcionalidades principales
-
-- Configuración automática de SSH, banners, usuarios y servicios básicos.
-- Filtro SSH por país con **ipinfo** (IPv4 e IPv6; sin geoip por compatibilidad en Ubuntu 24 / Debian 13).
-- Instalación opcional de Zabbix (7.4 LTS), WireGuard, Docker + Compose plugin, Borg, etc.
-- Personalización de banners de bienvenida (MOTD) genéricos.
-- Soporte para RAID ZFS (ARC generado según RAM; buenas prácticas para equipos con al menos 8 GB).
-- MegaRAID: repositorio con keyring `signed-by` (sin `apt-key` deprecado).
- - Zona horaria configurable vía menú (por defecto `America/Argentina/Buenos_Aires`).
-- Postfix: remitente saliente `hostname@dominio`, cabecera From `root <hostname@dominio>`, relayhost opcional (vacío = MX directo), correo de alertas vía aliases y virtual.
-
-## Personalización de banners y logo
-
-- Los banners de bienvenida se pueden personalizar editando los archivos:
-  - `install/systemd/pvebanner-service_custom`
-  - `install/systemd/pbsbanner-service_custom`
-  - `install/systemd/vmbanner-service_custom`
-- El logo mostrado en la interfaz de Proxmox debe llamarse **proxmox_logo_custom.png** y estar en la carpeta `install/images/`.  
-  El script lo instalará automáticamente en el sistema.
-
-## Pasos Opcionales
-
-### Banners genéricos
+## Quick start
 
 ```bash
-# PVE
-wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/systemd/pvebanner-service_custom -O /usr/bin/pvebanner && chmod +x /usr/bin/pvebanner && systemctl restart pvebanner.service
-# PBS
-wget https://raw.githubusercontent.com/avillalba96/script-altahost/main/install/systemd/pbsbanner-service_custom -O /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner && chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner && systemctl restart proxmox-backup-banner.service
+apt-get update; apt-get install -y git screen
+screen
+git clone https://github.com/avillalba96/script-altahost && cd script-altahost/install && ./altahost-start.sh
 ```
 
-### RAID ZFS (configuracion basica, machete)
+Run as **root** on a freshly installed system when possible.
 
-Se deja a mano los comandos aplicados sobre local-zfs. El script ya aplica ARC según RAM (2 GB mín, 50 % máx, tope 16 GB).
+## Defaults you may want to change
+
+At the top of `install/altahost-start.sh` (fallbacks only — the install UI asks again):
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `SUPPORT_USER` | `support` | Default shown in the form for the day-to-day sudo account |
+| `SSH_ALLOW_COUNTRIES` | `AR` | Default shown when prompting for SSH geo-allowlist |
+
+### Support username (create or reuse)
+
+In the main form you type the **support username** (e.g. `support`, `soportecc`, or an existing Ubuntu user like `usuariopepe`):
+
+- **Does not exist** → created (`sudo`, home, shell, optional password/SSH key)
+- **Already exists** → reused; script only applies what is needed (`sudo`, password if you typed one, SSH key if provided). Empty password field leaves the existing password unchanged.
+
+### SSH countries
+
+During install a **whiptail prompt** asks for ISO country codes (e.g. `US,DE,AR`), pre-filled with `SSH_ALLOW_COUNTRIES`. That value is written into `/usr/local/sbin/ipfilter-whitelist.sh`. You can also edit that file later and/or change the default constant in the script.
+
+## Main features
+
+- Baseline packages, SSH hardening helpers, MOTD banners, Postfix alerts
+- Creates or reuses the **support username** from the form (sudo + optional/required SSH key)
+- **VMs:** choose password SSH or key-only; custom SSH port; `PermitRootLogin no`
+- **PVE/PBS:** official `sshd` defaults left alone; you can still attach a key to `SUPPORT_USER`
+- SSH country filter via **ipinfo** + tcp_wrappers
+- Fail2ban: PVE/PBS UI jails + `sshd` jail
+- Optional: Zabbix 7.4 LTS, WireGuard, Docker + Compose plugin, Borg, QEMU guest agent
+- ZFS helpers (ARC from RAM); optional **Sanoid** snapshots; MegaRAID SMART path
+- Timezone menu (default `America/Argentina/Buenos_Aires`)
+- Install repo and logs kept for debug under `/var/log/altahost/` (form password is not written to disk)
+
+## Sanoid (optional)
+
+Asked only on the **ZFS** RAID path. Sanoid applies snapshot policies (template ships for `rpool/data`).
+
+Install order:
+
+1. Try **`apt install sanoid`** (Debian/Proxmox repos — preferred)
+2. If missing, **build from upstream git** (no forced old `libc6`)
+3. Copy `install/sanoidcfg/sanoid.conf_template` → `/etc/sanoid/sanoid.conf`
+4. Enable `sanoid.timer` when the package provides it
+
+Snapshot schedules add IO; skip Sanoid if you do not need host-side ZFS snaps.
+
+## Banners and logo
+
+- `install/systemd/pvebanner-service_custom`
+- `install/systemd/pbsbanner-service_custom`
+- `install/systemd/vmbanner-service_custom`
+- Optional Proxmox UI logo: `install/images/proxmox_logo_custom.png`
+
+## ZFS cheatsheet (applied on ZFS path)
 
 ```bash
 zfs set reservation=20G rpool/ROOT
@@ -82,12 +92,18 @@ pvesm set local-zfs --blocksize 128k
 pvesm set local-zfs --sparse 1
 ```
 
+`sync=disabled` trades durability on power loss for write performance — use deliberately.
+
 ## TO-DO
 
-1. Volver Genérico <https://github.com/avillalba96/borg_config>
-2. Implementar el script de forma genérica <https://github.com/avillalba96/script-pve_cloudinit>
+1. Make Borg path fully generic — <https://github.com/avillalba96/borg_config>
+2. Cloud-init companion — <https://github.com/avillalba96/script-pve_cloudinit>
 
-## Autores
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Authors
 
 - Maxi - [Maximiliano Baez](https://github.com/MaximilianoBz)
 - Pablito - [Pablo Ramos](https://github.com/avillalba96)
