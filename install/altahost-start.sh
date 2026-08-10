@@ -17,6 +17,196 @@ SUPPORT_USER="support"
 # Default SSH geo-allowlist; prompted again during install (ISO codes, e.g. US,DE,AR).
 SSH_ALLOW_COUNTRIES="AR"
 
+# Progress / resume helpers (survive cancel, SSH drop, or script crash)
+ALTA_DIR="/etc/altahost"
+ALTA_LOG_DIR="/var/log/altahost"
+CURRENT_STEP=""
+LAST_OK_STEP=""
+ALTA_FINISHED=0
+
+progress_log() {
+  mkdir -p "$ALTA_LOG_DIR" "$ALTA_DIR"
+  chmod 700 "$ALTA_LOG_DIR" 2>/dev/null || true
+  # Only step/status metadata — never passwords or key material
+  echo "$(date -Is) $*" >>"$ALTA_LOG_DIR/progress.log"
+  chmod 600 "$ALTA_LOG_DIR/progress.log" 2>/dev/null || true
+}
+
+write_last_step() {
+  mkdir -p "$ALTA_LOG_DIR"
+  {
+    echo "updated=$(date -Is)"
+    echo "status=$(cat "$ALTA_DIR/status" 2>/dev/null || echo unknown)"
+    echo "current_step=${CURRENT_STEP:-none}"
+    echo "last_ok_step=${LAST_OK_STEP:-none}"
+    echo "progress_log=${ALTA_LOG_DIR}/progress.log"
+    echo "full_log=${ALTA_LOG_DIR}/alta_altahost.log"
+  } >"$ALTA_LOG_DIR/last_step"
+  chmod 600 "$ALTA_LOG_DIR/last_step" 2>/dev/null || true
+}
+
+write_resume_help() {
+  local reason="$1"
+  mkdir -p "$ALTA_LOG_DIR"
+  cat >"$ALTA_LOG_DIR/HOW_TO_RESUME.txt" <<EOF
+script-altahost did not finish cleanly.
+reason=${reason}
+current_step=${CURRENT_STEP:-none}
+last_ok_step=${LAST_OK_STEP:-none}
+updated=$(date -Is)
+
+What to do next:
+1. Re-run:  cd <cloned-repo>/install && ./altahost-start.sh
+2. Choose YES when asked to retry an incomplete install.
+3. Read last_ok_step above — that is the last phase that finished.
+4. Full console log: ${ALTA_LOG_DIR}/alta_altahost.log
+5. Step timeline:    ${ALTA_LOG_DIR}/progress.log
+
+Note: a retry restarts the installer from the beginning; steps are written to be idempotent
+(safe to repeat: no duplicate cron/sysctl/vzdump lines, banners use a single .bkp, users are reused).
+Use last_ok_step / progress.log to see how far it got and what to double-check.
+
+Privacy: these resume/progress files must not contain passwords or SSH private/public key material.
+EOF
+  chmod 600 "$ALTA_LOG_DIR/HOW_TO_RESUME.txt" 2>/dev/null || true
+}
+
+alta_mark_in_progress() {
+  mkdir -p "$ALTA_DIR" "$ALTA_LOG_DIR"
+  echo "in_progress" >"$ALTA_DIR/status"
+  echo "in_progress" >"$ALTA_DIR/alta_script"
+  progress_log "STATUS in_progress"
+  write_last_step
+}
+
+alta_mark_completed() {
+  ALTA_FINISHED=1
+  mkdir -p "$ALTA_DIR" "$ALTA_LOG_DIR"
+  echo "completed" >"$ALTA_DIR/status"
+  echo "completed" >"$ALTA_DIR/alta_script"
+  CURRENT_STEP="finished"
+  progress_log "STATUS completed last_ok=${LAST_OK_STEP:-finish_script}"
+  write_last_step
+  rm -f "$ALTA_LOG_DIR/HOW_TO_RESUME.txt"
+  sanitize_alta_logs
+}
+
+alta_mark_interrupted() {
+  local reason="${1:-interrupted}"
+  [[ "${ALTA_FINISHED:-0}" -eq 1 ]] && return 0
+  mkdir -p "$ALTA_DIR" "$ALTA_LOG_DIR"
+  echo "interrupted" >"$ALTA_DIR/status"
+  echo "interrupted" >"$ALTA_DIR/alta_script"
+  progress_log "STATUS ${reason} current=${CURRENT_STEP:-none} last_ok=${LAST_OK_STEP:-none}"
+  write_last_step
+  write_resume_help "$reason"
+  sanitize_alta_logs
+}
+
+install_abort() {
+  alta_mark_interrupted "${1:-user_abort}"
+  clear
+  echo -e "\e[0;31m[ABORTED]\e[0m ${1:-user_abort}"
+  echo -e "See \e[1;33m${ALTA_LOG_DIR}/HOW_TO_RESUME.txt\e[0m and \e[1;33m${ALTA_LOG_DIR}/last_step\e[0m"
+  exit 1
+}
+
+step_start() {
+  CURRENT_STEP="$1"
+  progress_log "START $1"
+  write_last_step
+  echo -e "\e[1;34m[STEP]\e[0m starting: $1"
+}
+
+step_ok() {
+  LAST_OK_STEP="$1"
+  progress_log "OK $1"
+  CURRENT_STEP=""
+  write_last_step
+  echo -e "\e[1;32m[STEP]\e[0m done: $1"
+}
+
+run_step() {
+  local name="$1"
+  shift
+  step_start "$name"
+  "$@"
+  step_ok "$name"
+}
+
+# Read previous run status (supports legacy alta_script=1 as completed)
+alta_previous_status() {
+  if [[ -f "$ALTA_DIR/status" ]]; then
+    cat "$ALTA_DIR/status"
+    return 0
+  fi
+  if [[ -f "$ALTA_DIR/alta_script" ]]; then
+    local legacy
+    legacy=$(tr -d ' \t\r\n' <"$ALTA_DIR/alta_script")
+    case "$legacy" in
+    completed | interrupted | in_progress) echo "$legacy" ;;
+    1) echo "completed" ;; # old flag meant "already run"
+    *) echo "completed" ;;
+    esac
+    return 0
+  fi
+  echo "none"
+}
+
+# ---------- Idempotent helpers (safe re-run) ----------
+ensure_line_in_file() {
+  local file="$1"
+  local line="$2"
+  mkdir -p "$(dirname "$file")" 2>/dev/null || true
+  touch "$file"
+  grep -qxF "$line" "$file" 2>/dev/null || printf '%s\n' "$line" >>"$file"
+}
+
+ensure_sysctl_kv() {
+  local key="$1"
+  local value="$2"
+  local file="${3:-/etc/sysctl.conf}"
+  touch "$file"
+  if grep -qE "^[[:space:]]*${key}[[:space:]]*=" "$file" 2>/dev/null; then
+    sed -i -E "s|^[[:space:]]*${key}[[:space:]]*=.*|${key} = ${value}|" "$file"
+  else
+    printf '%s = %s\n' "$key" "$value" >>"$file"
+  fi
+}
+
+install_file_with_backup() {
+  # Copy src -> dest; keep one .bkp of the original dest if missing
+  local src="$1"
+  local dest="$2"
+  local bkp="${dest}.bkp"
+  [[ -f "$src" ]] || return 1
+  if [[ -e "$dest" && ! -e "$bkp" ]]; then
+    cp -a "$dest" "$bkp"
+    chmod -x "$bkp" 2>/dev/null || true
+  fi
+  cp -f "$src" "$dest"
+  chmod +x "$dest" 2>/dev/null || true
+}
+
+# Redact secrets from persistent logs (passwords / pubkey material never stored on purpose;
+# this is a safety net for accidental echo/tee leakage).
+sanitize_alta_logs() {
+  mkdir -p "$ALTA_LOG_DIR"
+  local f
+  for f in alta_altahost.log progress.log last_step HOW_TO_RESUME.txt alta_summary.txt; do
+    [[ -f "$ALTA_LOG_DIR/$f" ]] || continue
+    # OpenSSH public key material
+    sed -i -E 's/(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)[[:space:]]+[^[:space:]]+/\1 [REDACTED]/g' "$ALTA_LOG_DIR/$f" 2>/dev/null || true
+    # Common password assignments / chpasswd leftovers
+    sed -i -E \
+      -e 's/(USER_PASSWORD|PASSWORD|password)[[:space:]]*[:=][[:space:]]*[^[:space:]]+/\1=[REDACTED]/gI' \
+      -e 's/^[^:]+:[^[:space:]]+$/[REDACTED_CHPASSWD_LINE]/' \
+      "$ALTA_LOG_DIR/$f" 2>/dev/null || true
+    chmod 600 "$ALTA_LOG_DIR/$f" 2>/dev/null || true
+  done
+  chmod 700 "$ALTA_LOG_DIR" 2>/dev/null || true
+}
+
 install_amdfixes() {
   if [[ $AMDFIXES -eq 1 ]]; then
     ## Detect AMD EPYC CPU and Apply Fixes
@@ -31,8 +221,9 @@ install_amdfixes() {
     fi
     if [ "$(grep -i -m 1 "model name" /proc/cpuinfo | grep -i "EPYC")" != "" ] || [ "$(grep -i -m 1 "model name" /proc/cpuinfo | grep -i "Ryzen")" != "" ]; then
       ## Add msrs ignore to fix Windows guest on EPIC/Ryzen host
-      echo "options kvm ignore_msrs=Y" >>/etc/modprobe.d/kvm.conf
-      echo "options kvm report_ignored_msrs=N" >>/etc/modprobe.d/kvm.conf
+      mkdir -p /etc/modprobe.d
+      ensure_line_in_file /etc/modprobe.d/kvm.conf "options kvm ignore_msrs=Y"
+      ensure_line_in_file /etc/modprobe.d/kvm.conf "options kvm report_ignored_msrs=N"
     fi
   fi
 }
@@ -129,46 +320,42 @@ install_qemu() {
 }
 
 install_motd() {
-    cp systemd/vmbanner-service_custom systemd/vmbanner-service
-    cp systemd/pvebanner-service_custom systemd/pvebanner-service
-    cp systemd/pbsbanner-service_custom systemd/pbsbanner-service
-
   if [[ $PROXMOX_YES -eq 1 ]]; then
-    mv /usr/bin/pvebanner /usr/bin/pvebanner.bkp
-    chmod -x /usr/bin/pvebanner.bkp
-    mv systemd/pvebanner-service /usr/bin/pvebanner
-    chmod +x /usr/bin/pvebanner
-    #chattr +i /usr/bin/pvebanner
+    install_file_with_backup "$DIRALTA/systemd/pvebanner-service_custom" /usr/bin/pvebanner
     systemctl restart pvebanner.service
-    sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    # Subscription nag bypass (idempotent replace)
+    if [[ -f /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js ]]; then
+      sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    fi
     install_proxmox_logo
     systemctl restart pveproxy.service
 
   elif [[ $PROXMOX_BACKUP_YES -eq 1 ]]; then
-    mv /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
-    chmod -x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner.bkp
-    mv systemd/pbsbanner-service /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
-    chmod +x /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
-    #chattr +i /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
+    install_file_with_backup "$DIRALTA/systemd/pbsbanner-service_custom" /usr/lib/x86_64-linux-gnu/proxmox-backup/proxmox-backup-banner
     systemctl restart proxmox-backup-banner.service
-    sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    if [[ -f /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js ]]; then
+      sed -i "s/.data.status.toLowerCase() !==/.data.status.toLowerCase() ==/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    fi
     install_proxmox_logo
     systemctl restart proxmox-backup-proxy.service
 
   else
-    mv systemd/vmbanner-service /usr/bin/vmbanner
-    chmod +x /usr/bin/vmbanner
-    #chattr +i /usr/bin/vmbanner
-    cp systemd/vmbanner.service /lib/systemd/system/vmbanner.service
+    install_file_with_backup "$DIRALTA/systemd/vmbanner-service_custom" /usr/bin/vmbanner
+    cp "$DIRALTA/systemd/vmbanner.service" /lib/systemd/system/vmbanner.service
     systemctl daemon-reload
-    systemctl start vmbanner.service
     systemctl enable vmbanner.service
+    systemctl restart vmbanner.service
   fi
 }
 
 install_client_vpn() {
   if [[ $VPNON -eq 1 ]]; then
-    git clone https://github.com/avillalba96/script-altacertificadovpn.git && cd "$(basename "$_" .git)" && ./altaopenvpn
+    local vpn_dir
+    vpn_dir="$DIRALTA/../script-altacertificadovpn"
+    if [[ ! -d "$vpn_dir/.git" ]]; then
+      git clone https://github.com/avillalba96/script-altacertificadovpn.git "$vpn_dir"
+    fi
+    (cd "$vpn_dir" && ./altaopenvpn)
   fi
 }
 
@@ -202,14 +389,23 @@ install_docker() {
   wget -O /usr/local/bin/ufw-docker https://github.com/chaifeng/ufw-docker/raw/master/ufw-docker
   chmod +x /usr/local/bin/ufw-docker
 
-  # Check and configure secondary disk
+  # Check and configure secondary disk (idempotent: only migrate once)
   if mountpoint -q /u/; then
     echo -e "\e[32m[OK]\e[0m Secondary disk mounted at /u/. Configuring Docker data directory..."
 
     mkdir -p /u/var-lib-docker
-    systemctl stop docker.socket && systemctl stop docker.service && systemctl stop containerd.service
-    rsync -avh --progress /var/lib/docker/ /u/var-lib-docker/.
-    rm -r /var/lib/docker && ln -s /u/var-lib-docker /var/lib/docker
+    if [[ ! -L /var/lib/docker ]]; then
+      systemctl stop docker.socket 2>/dev/null || true
+      systemctl stop docker.service 2>/dev/null || true
+      systemctl stop containerd.service 2>/dev/null || true
+      if [[ -d /var/lib/docker ]]; then
+        rsync -avh --progress /var/lib/docker/ /u/var-lib-docker/.
+        rm -rf /var/lib/docker
+      fi
+      ln -sfn /u/var-lib-docker /var/lib/docker
+      systemctl start containerd.service 2>/dev/null || true
+      systemctl start docker.service 2>/dev/null || true
+    fi
 
   else
     WARNINGS+="[WARNING] No secondary disk mounted at /u/. Check fstab and disk formatting.\n"
@@ -245,10 +441,25 @@ setup_user_ssh_key() {
   chown -R "$user:$user" "$home_dir/.ssh"
 }
 
-# Basic OpenSSH public key format check (single line)
+# Validate OpenSSH public key: non-empty, known type prefix, and parseable by ssh-keygen when available
 validate_ssh_pubkey() {
   local key="$1"
-  [[ "$key" =~ ^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)[[:space:]]+ ]]
+  local tmp
+
+  [[ -z "$key" ]] && return 1
+  [[ "$key" =~ ^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)[[:space:]]+[^[:space:]]+ ]] || return 1
+
+  # Structural check with ssh-keygen (catches truncated/corrupt base64)
+  if command -v ssh-keygen >/dev/null 2>&1; then
+    tmp=$(mktemp /tmp/altahost-pubkey.XXXXXX)
+    printf '%s\n' "$key" >"$tmp"
+    if ! ssh-keygen -l -f "$tmp" >/dev/null 2>&1; then
+      rm -f "$tmp"
+      return 1
+    fi
+    rm -f "$tmp"
+  fi
+  return 0
 }
 
 # Prompt for public key: .pub file or paste into inputbox
@@ -266,8 +477,12 @@ prompt_ssh_pubkey() {
     pubkey_raw=$(echo "$pubkey_raw" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   fi
 
+  if [[ -z "$pubkey_raw" ]]; then
+    whiptail --msgbox "Public key is empty. Paste a full line or point to a valid .pub file." 9 70
+    return 1
+  fi
   if ! validate_ssh_pubkey "$pubkey_raw"; then
-    whiptail --msgbox "Invalid public key. It must start with ssh-ed25519, ssh-rsa, or ecdsa-..." 9 70
+    whiptail --msgbox "Invalid or corrupt public key.\nMust be one OpenSSH line (ssh-ed25519 / ssh-rsa / ecdsa-...) and pass ssh-keygen -l." 10 72
     return 1
   fi
   SSH_PUBKEY="$pubkey_raw"
@@ -296,8 +511,7 @@ configure_ssh_auth_options() {
     SSH_ALLOW_PASSWORD=1
     if [[ -z "$USER_PASSWORD" ]]; then
       whiptail --msgbox "With SSH password enabled, the ${SUPPORT_USER} password cannot be empty.\nRe-run the script and enter it in the form." 10 70
-      rm -f /etc/altahost/alta_script
-      exit 1
+      install_abort "empty_password_with_ssh_password_auth"
     fi
     if (whiptail --title "SSH key" --yesno "Also add an SSH public key for ${SUPPORT_USER}?" 10 60); then
       while ! prompt_ssh_pubkey; do
@@ -311,8 +525,7 @@ configure_ssh_auth_options() {
     while ! prompt_ssh_pubkey; do
       if ! (whiptail --title "SSH key" --yesno "A key is required if password auth is disabled.\nRetry?" 10 60); then
         whiptail --msgbox "Installation cancelled: an SSH public key is required for ${SUPPORT_USER}." 8 60
-        rm -f /etc/altahost/alta_script
-        exit 1
+        install_abort "ssh_pubkey_required_cancelled"
       fi
     done
   fi
@@ -464,16 +677,16 @@ config_raid_megacli() {
   aptitude install -y megaclisas-status
 
   # Configure SMART
-  echo "start_smartd=yes" >>/etc/default/smartmontools
+  ensure_line_in_file /etc/default/smartmontools "start_smartd=yes"
 
   # Configure disk monitoring
   DISKS=($(megacli -pdlist -a0 | grep 'Device Id' | cut -d " " -f 3))
 
-  # Add disks to monitoring
+  # Add disks to monitoring (rewrite from template each run — idempotent)
   cp "$DIRALTA/smart/megaraid" /etc/smartd.conf
 
   for disk in "${DISKS[@]}"; do
-    echo "/dev/sda -d megaraid,$disk -S on -o on -a -I 194 -s (S/../.././01|L/../../7/02) -m $CORREO" >>/etc/smartd.conf
+    ensure_line_in_file /etc/smartd.conf "/dev/sda -d megaraid,$disk -S on -o on -a -I 194 -s (S/../.././01|L/../../7/02) -m $CORREO"
   done
 
   systemctl restart smartd.service
@@ -493,7 +706,7 @@ config_raid_zfs() {
 
   # Enable email alerts
   apt-get install -y zfs-zed
-  echo 'ZED_EMAIL_ADDR="root"' >>/etc/zfs/zed.d/zed.rc
+  ensure_line_in_file /etc/zfs/zed.d/zed.rc 'ZED_EMAIL_ADDR="root"'
   systemctl restart zfs-zed.service
 
   # Reserve space for the ROOT dataset
@@ -517,9 +730,7 @@ config_raid_zfs() {
 
   # Reduce SWAP usage
   sysctl -w vm.swappiness=1
-
-  # Persist setting
-  sed -i "s/.*vm.swappiness\+.*/vm.swappiness = 1/" /etc/sysctl.conf
+  ensure_sysctl_kv "vm.swappiness" "1"
 
   # ZFS ARC sized from RAM (min 8GB guidance; avoid starving the system)
   RAM_BYTES=$(awk '/MemTotal/ {print $2*1024}' /proc/meminfo)
@@ -544,7 +755,7 @@ EOF
   aptitude install -y smartmontools
 
   # Configure SMART
-  echo "start_smartd=yes" >>/etc/default/smartmontools
+  ensure_line_in_file /etc/default/smartmontools "start_smartd=yes"
 
   # Add disks to monitoring
   cp "$DIRALTA/smart/smartmontools" /etc/smartd.conf
@@ -686,8 +897,11 @@ install_server_proxmox() {
   cp fail2ban/jail.local /etc/fail2ban/
   systemctl reload fail2ban.service
 
-  # Enable pigz compression for gzip
-  echo "pigz: 1" >>/etc/vzdump.conf
+  # Enable pigz compression for gzip (once)
+  touch /etc/vzdump.conf
+  if ! grep -qE '^[[:space:]]*pigz:' /etc/vzdump.conf; then
+    echo "pigz: 1" >>/etc/vzdump.conf
+  fi
 
   # Copy PVE scripts
   cp scripts/proxmox/* /usr/local/sbin/
@@ -756,8 +970,13 @@ finish_script() {
     echo "pbs=${PROXMOX_BACKUP_YES:-0}"
     echo "repo=${REPO_ROOT}"
     echo "log=/var/log/altahost/alta_altahost.log"
+    echo "progress_log=/var/log/altahost/progress.log"
+    echo "last_step=/var/log/altahost/last_step"
+    echo "status=completed"
   } >/var/log/altahost/alta_summary.txt
   chmod 600 /var/log/altahost/alta_summary.txt
+
+  alta_mark_completed
 
   clear
   echo ""
@@ -786,6 +1005,7 @@ finish_script() {
   echo -e "\e[0;31mDEBUG: \e[0mRepo kept at \e[1;33m$REPO_ROOT\e[0m"
   echo -e "\e[0m       Log: \e[1;33m/var/log/altahost/alta_altahost.log\e[0m"
   echo -e "\e[0m       Summary: \e[1;33m/var/log/altahost/alta_summary.txt\e[0m"
+  echo -e "\e[0m       Progress: \e[1;33m/var/log/altahost/progress.log\e[0m"
   echo ""
   echo -e "\e[0;31mREMINDER: \e[0mAdd this host to the backup system \e[0m"
   echo -e "\e[0m[\e[1;31mBORG \e[0;0m/ \e[1;33mPROXMOX \e[0;0m/ \e[1;33mPBS \e[0;0m/ \e[1;32mVEEAM\e[0m]"
@@ -837,13 +1057,11 @@ init_script() {
   # Validate support username (create-or-reuse target)
   if [[ -z "$SUPPORT_USER" || "$SUPPORT_USER" == "root" ]]; then
     whiptail --msgbox "Support username cannot be empty or 'root'." 8 50
-    rm -f /etc/altahost/alta_script
-    exit 1
+    install_abort "invalid_support_user"
   fi
   if [[ ! "$SUPPORT_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
     whiptail --msgbox "Invalid support username: ${SUPPORT_USER}\nUse lowercase letters, digits, _ or -." 9 60
-    rm -f /etc/altahost/alta_script
-    exit 1
+    install_abort "invalid_support_user_format"
   fi
 
   FQDN="${HOST}.${DOMINIO}"
@@ -953,14 +1171,22 @@ init_script() {
   systemctl restart postfix.service
   newaliases
 
-  # Configure Cron
-  cat crontab/modelo_crontab >>/var/spool/cron/crontabs/root
-  chmod 600 /var/spool/cron/crontabs/root
+  # Configure Cron (once — marked block, no duplicates on retry)
+  local cron_file="/var/spool/cron/crontabs/root"
+  local cron_marker="### altahost-modelo_crontab ###"
+  touch "$cron_file"
+  if ! grep -qF "$cron_marker" "$cron_file" 2>/dev/null; then
+    {
+      echo "$cron_marker"
+      cat "$DIRALTA/crontab/modelo_crontab"
+    } >>"$cron_file"
+  fi
+  chmod 600 "$cron_file"
   systemctl restart cron.service
 
   # Reduce SWAP usage
   sysctl -w vm.swappiness=10
-  echo "vm.swappiness = 10" >>/etc/sysctl.conf
+  ensure_sysctl_kv "vm.swappiness" "10"
 }
 
 select_package_init() {
@@ -991,43 +1217,41 @@ select_package_init() {
 }
 
 start_install() {
-  select_package_init
-  init_script
-  # Company support user on all OSes (Debian/Ubuntu/PVE/PBS)
-  ensure_support_user
-  install_zabbix_basic
+  run_step select_package_init select_package_init
+  run_step init_script init_script
+  run_step ensure_support_user ensure_support_user
+  run_step install_zabbix_basic install_zabbix_basic
   if [[ $PROXMOX_YES -eq 1 ]]; then
-    install_server_proxmox
-    config_raid
-    install_amdfixes
-    install_ksmtuned
+    run_step install_server_proxmox install_server_proxmox
+    run_step config_raid config_raid
+    run_step install_amdfixes install_amdfixes
+    run_step install_ksmtuned install_ksmtuned
   elif [[ $PROXMOX_BACKUP_YES -eq 1 ]]; then
-    install_server_proxmox_backup_server
-    config_raid
+    run_step install_server_proxmox_backup_server install_server_proxmox_backup_server
+    run_step config_raid config_raid
   else
-    install_vm
-    install_qemu
+    run_step install_vm install_vm
+    run_step install_qemu install_qemu
   fi
-  install_motd
-  install_ssh
-  install_borg
-  install_client_vpn
-  install_wireguard
-  finish_script
+  run_step install_motd install_motd
+  run_step install_ssh install_ssh
+  run_step install_borg install_borg
+  run_step install_client_vpn install_client_vpn
+  run_step install_wireguard install_wireguard
+  run_step finish_script finish_script
 }
 
 prepare_system() {
-  # Create installation flag
-  mkdir /etc/altahost 2>/dev/null
-  echo "1" >/etc/altahost/alta_script
+  alta_mark_in_progress
+  step_start prepare_system
 
   # Disable IPv6
   echo -e "Acquire::ForceIPv4 \"true\";\\n" >/etc/apt/apt.conf.d/99-force-ipv4
   # Ensure /etc/sysctl.conf exists before using sed
   [ -f /etc/sysctl.conf ] || touch /etc/sysctl.conf
-  sed -i '$a net.ipv6.conf.all.disable_ipv6 = 1' /etc/sysctl.conf
-  sed -i '$a net.ipv6.conf.default.disable_ipv6 = 1' /etc/sysctl.conf
-  sed -i '$a net.ipv6.conf.lo.disable_ipv6 = 1' /etc/sysctl.conf
+  ensure_sysctl_kv "net.ipv6.conf.all.disable_ipv6" "1"
+  ensure_sysctl_kv "net.ipv6.conf.default.disable_ipv6" "1"
+  ensure_sysctl_kv "net.ipv6.conf.lo.disable_ipv6" "1"
   sysctl --system
 
   # Install packages required for the installation menu
@@ -1039,18 +1263,13 @@ prepare_system() {
     UBUNTUVERSION_YES=$(lsb_release -is | grep -ci "ubuntu")
 
     if [[ ("$DEBIANVERSION_YES" == 0) && ("$UBUNTUVERSION_YES" == 0) ]]; then
-      rm /etc/altahost/alta_script
-      clear
-      echo -e "\e[0;31m[ERROR]: \e[0mNo compatible OS detected for this script\e[0m"
-      exit
+      install_abort "unsupported_os"
     else
+      step_ok prepare_system
       start_install
     fi
   else
-    rm /etc/altahost/alta_script
-    clear
-    echo -e "\e[0;31m[ERROR]: \e[0mSCRIPT ALTA installation was cancelled\e[0m"
-    exit
+    install_abort "cancelled_internet_check"
   fi
 }
 
@@ -1072,19 +1291,62 @@ main() {
     SSH_PUBKEY=""
     ERRORS=""
     WARNINGS=""
+    CURRENT_STEP=""
+    LAST_OK_STEP=""
+    ALTA_FINISHED=0
 
     # Start installation
     clear
-    mkdir -p /var/log/altahost/
-    chmod 700 /var/log/altahost/
-    if [[ -f /etc/altahost/alta_script ]]; then
-      echo -e "\e[0;31m[ERROR]: \e[0mThis host has already been provisioned\e[0m"
-      exit
-    fi
-    ( (
-      prepare_system
-    ) 2>&1) | tee /var/log/altahost/alta_altahost.log
-    chmod 600 /var/log/altahost/alta_altahost.log 2>/dev/null || true
+    mkdir -p "$ALTA_LOG_DIR"
+    chmod 700 "$ALTA_LOG_DIR"
+
+    local prev_status
+    prev_status=$(alta_previous_status)
+    case "$prev_status" in
+    completed)
+      echo -e "\e[0;31m[ERROR]: \e[0mThis host has already been provisioned (status=completed)\e[0m"
+      [[ -f "$ALTA_LOG_DIR/last_step" ]] && echo -e "See \e[1;33m${ALTA_LOG_DIR}/last_step\e[0m"
+      exit 1
+      ;;
+    in_progress | interrupted)
+      echo -e "\e[1;33m[INFO]: \e[0mIncomplete previous run detected (status=${prev_status})\e[0m"
+      if [[ -f "$ALTA_LOG_DIR/last_step" ]]; then
+        echo "---- last_step ----"
+        cat "$ALTA_LOG_DIR/last_step"
+        echo "-------------------"
+      fi
+      if [[ -f "$ALTA_LOG_DIR/HOW_TO_RESUME.txt" ]]; then
+        echo "---- HOW_TO_RESUME ----"
+        cat "$ALTA_LOG_DIR/HOW_TO_RESUME.txt"
+        echo "----------------------"
+      fi
+      local retry=0
+      if command -v whiptail >/dev/null 2>&1; then
+        if (whiptail --title "Incomplete install" --yesno "A previous install did not finish.\n\nstatus=${prev_status}\n\nRetry now? (restarts from the beginning; check last_ok_step in the log)" 14 70); then
+          retry=1
+        fi
+      else
+        echo -n "Retry incomplete install now? [y/N]: "
+        read -r ans || true
+        [[ "$ans" =~ ^[Yy]$ ]] && retry=1
+      fi
+      if [[ $retry -ne 1 ]]; then
+        echo -e "Aborted. Resume hints: \e[1;33m${ALTA_LOG_DIR}/HOW_TO_RESUME.txt\e[0m"
+        exit 1
+      fi
+      progress_log "RETRY accepted after status=${prev_status}"
+      ;;
+    esac
+
+    (
+      (
+        trap 'alta_mark_interrupted interrupted_signal' INT TERM
+        trap '[[ ${ALTA_FINISHED:-0} -eq 1 ]] || alta_mark_interrupted unexpected_exit' EXIT
+        prepare_system
+      ) 2>&1
+    ) | tee -a "$ALTA_LOG_DIR/alta_altahost.log"
+    sanitize_alta_logs
+    chmod 600 "$ALTA_LOG_DIR/alta_altahost.log" 2>/dev/null || true
   fi
 }
 

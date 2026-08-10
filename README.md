@@ -60,6 +60,7 @@ During install a **whiptail prompt** asks for ISO country codes (e.g. `US,DE,AR`
 - ZFS helpers (ARC from RAM); optional **Sanoid** snapshots; MegaRAID SMART path
 - Timezone menu (default `America/Argentina/Buenos_Aires`)
 - Install repo and logs kept for debug under `/var/log/altahost/` (form password is not written to disk)
+- **Resume-friendly progress:** each phase is logged; on cancel/SSH drop/crash see `last_step`, `progress.log`, and `HOW_TO_RESUME.txt`. Re-running offers a retry. Risky steps are **idempotent** (no duplicate cron/sysctl/vzdump, safe banner/user reuse). Logs are mode `600` and scrubbed so passwords/SSH key material are not kept.
 
 ## Sanoid (optional)
 
