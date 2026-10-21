@@ -462,23 +462,14 @@ validate_ssh_pubkey() {
   return 0
 }
 
-# Prompt for public key: .pub file or paste into inputbox
+# Prompt for public key: paste the full content of the .pub file
 prompt_ssh_pubkey() {
-  local pubkey_path pubkey_raw
-  if (whiptail --title "SSH key" --yesno "Is the public key available as a file on this server?\n\nYES = provide path to .pub\nNO  = paste the key (one line)" 12 70); then
-    pubkey_path=$(whiptail --inputbox "Path to .pub file:" 10 70 "/root/.ssh/id_ed25519.pub" 3>&1 1>&2 2>&3) || return 1
-    if [[ ! -f "$pubkey_path" ]]; then
-      whiptail --msgbox "File not found: $pubkey_path" 8 60
-      return 1
-    fi
-    pubkey_raw=$(head -n 1 "$pubkey_path" | tr -d '\r')
-  else
-    pubkey_raw=$(whiptail --inputbox "Paste the SSH public key (one line):" 10 78 "" 3>&1 1>&2 2>&3) || return 1
-    pubkey_raw=$(echo "$pubkey_raw" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-  fi
+  local pubkey_raw
+  pubkey_raw=$(whiptail --title "SSH key (${SUPPORT_USER})" --inputbox "Paste the full SSH public key (content of the .pub file, one line):\n\ne.g. ssh-ed25519 AAAAC3Nza... user@host" 12 78 "" 3>&1 1>&2 2>&3) || return 1
+  pubkey_raw=$(echo "$pubkey_raw" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
   if [[ -z "$pubkey_raw" ]]; then
-    whiptail --msgbox "Public key is empty. Paste a full line or point to a valid .pub file." 9 70
+    whiptail --msgbox "Public key is empty. Paste the full line of the .pub file." 9 70
     return 1
   fi
   if ! validate_ssh_pubkey "$pubkey_raw"; then
@@ -498,37 +489,74 @@ configure_ssh_auth_options() {
   if [[ $PROXMOX_YES -eq 1 || $PROXMOX_BACKUP_YES -eq 1 ]]; then
     # Hypervisor: official sshd defaults; optional pubkey only for SUPPORT_USER
     if (whiptail --title "SSH key (${SUPPORT_USER})" --yesno "Add an SSH public key for user ${SUPPORT_USER}?\n\n(PVE/PBS sshd is not modified)" 11 70); then
-      while ! prompt_ssh_pubkey; do
-        if ! (whiptail --title "SSH key" --yesno "Retry loading the public key?" 8 50); then
-          break
-        fi
-      done
+      prompt_ssh_pubkey_until_valid || true
     fi
     return 0
   fi
 
-  if (whiptail --title "SSH authentication" --yesno "Allow SSH login with password?\n\nRecommended: NO (public key only for ${SUPPORT_USER}).\n\nYES = password (and optionally a key)\nNO  = public key only" 14 70); then
+  # Never aborts: without a valid key it falls back to Ubuntu defaults (password login, no root over SSH)
+  if (whiptail --title "SSH authentication" --yesno "Allow SSH login with password for ${SUPPORT_USER}?\n\nYES = password (and optionally a key)\nNO  = public key only (if no key is loaded, password login is kept)\n\nroot can never log in over SSH (use sudo)." 15 74); then
     SSH_ALLOW_PASSWORD=1
-    if [[ -z "$USER_PASSWORD" ]]; then
-      whiptail --msgbox "With SSH password enabled, the ${SUPPORT_USER} password cannot be empty.\nRe-run the script and enter it in the form." 10 70
-      install_abort "empty_password_with_ssh_password_auth"
-    fi
     if (whiptail --title "SSH key" --yesno "Also add an SSH public key for ${SUPPORT_USER}?" 10 60); then
-      while ! prompt_ssh_pubkey; do
-        if ! (whiptail --title "SSH key" --yesno "Retry loading the public key?" 8 50); then
-          break
-        fi
-      done
+      prompt_ssh_pubkey_until_valid || true
     fi
   else
     SSH_ALLOW_PASSWORD=0
-    while ! prompt_ssh_pubkey; do
-      if ! (whiptail --title "SSH key" --yesno "A key is required if password auth is disabled.\nRetry?" 10 60); then
-        whiptail --msgbox "Installation cancelled: an SSH public key is required for ${SUPPORT_USER}." 8 60
-        install_abort "ssh_pubkey_required_cancelled"
-      fi
-    done
+    if ! prompt_ssh_pubkey_until_valid; then
+      SSH_ALLOW_PASSWORD=1
+      whiptail --title "SSH authentication" --msgbox "No SSH key loaded: password login is kept for ${SUPPORT_USER} (Ubuntu default).\nroot still cannot log in over SSH." 10 74
+      WARNINGS+="[WARN] No SSH key for ${SUPPORT_USER}: SSH password login kept enabled.\n"
+    fi
   fi
+
+  if [[ $SSH_ALLOW_PASSWORD -eq 1 && -z "$USER_PASSWORD" ]] && ! support_user_has_password; then
+    whiptail --msgbox "${SUPPORT_USER} has no usable password yet.\nSet one now to be able to log in over SSH (empty = continue without it)." 10 74
+    prompt_support_password || true
+    if [[ -z "$USER_PASSWORD" && -z "$SSH_PUBKEY" ]]; then
+      WARNINGS+="[WARN] ${SUPPORT_USER} has no password and no SSH key: SSH login will not work for that user.\n"
+    fi
+  fi
+}
+
+# Ask for the key until it is valid; returns 1 only if the user declines to retry
+prompt_ssh_pubkey_until_valid() {
+  while ! prompt_ssh_pubkey; do
+    if ! (whiptail --title "SSH key" --yesno "No valid public key loaded.\n\nRetry?\n\nYES = paste it again\nNO  = continue without a key" 13 60); then
+      return 1
+    fi
+  done
+  return 0
+}
+
+# True if SUPPORT_USER exists and has a usable (not locked/empty) password
+support_user_has_password() {
+  [[ "$(passwd -S "$SUPPORT_USER" 2>/dev/null | awk '{print $2}')" == "P" ]]
+}
+
+# Ask the SUPPORT_USER password twice. Empty = keep current (existing user) or locked (new user).
+# Returns 1 on cancel. Kept only in memory, never written to disk.
+prompt_support_password() {
+  local hint pass1 pass2
+  if id -u "$SUPPORT_USER" >/dev/null 2>&1; then
+    hint="empty = keep current password"
+  else
+    hint="new user; empty = locked, SSH key only"
+  fi
+  while true; do
+    pass1=$(dialog --clear --insecure --passwordbox "Password for ${SUPPORT_USER}\n(${hint}):" 10 70 2>&1 >/dev/tty) || return 1
+    pass1=${pass1//$'\r'/}
+    if [[ -z "$pass1" ]]; then
+      USER_PASSWORD=""
+      return 0
+    fi
+    pass2=$(dialog --clear --insecure --passwordbox "Repeat password for ${SUPPORT_USER}:" 10 70 2>&1 >/dev/tty) || return 1
+    pass2=${pass2//$'\r'/}
+    if [[ "$pass1" == "$pass2" ]]; then
+      USER_PASSWORD="$pass1"
+      return 0
+    fi
+    whiptail --msgbox "Passwords do not match. Try again." 8 50
+  done
 }
 
 ensure_support_user() {
@@ -608,6 +636,12 @@ install_ssh() {
     else
       sed -ri 's/^#?PasswordAuthentication\s+.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
     fi
+    # sshd keeps the first value seen and Include'd drop-ins (e.g. Ubuntu 50-cloud-init.conf) are read first
+    local pass_value="yes"
+    [[ "${SSH_ALLOW_PASSWORD:-1}" -eq 0 ]] && pass_value="no"
+    for f in /etc/ssh/sshd_config.d/*.conf; do
+      [ -f "$f" ] && sed -ri "s/^\s*PasswordAuthentication\s+.*/PasswordAuthentication ${pass_value}/I" "$f"
+    done
     # Align fail2ban jail port with custom SSH port
     if [[ -f /etc/fail2ban/jail.d/sshd.conf ]]; then
       sed -i "s/^port = .*/port = $SSH_PORT/" /etc/fail2ban/jail.d/sshd.conf
@@ -1028,41 +1062,60 @@ init_script() {
 
   # Collect host details
   HOST=$(hostname)
-  local form_tmp form_clean
-  form_tmp=$(mktemp /tmp/altahost-form.XXXXXX)
-  form_clean=$(mktemp /tmp/altahost-form-clean.XXXXXX)
-  chmod 600 "$form_tmp" "$form_clean"
+  local form_out
+  local form_domain="example.com" form_user="$SUPPORT_USER" form_port="23242"
+  local form_mail="alerts@example.com" form_relay="172.26.0.1"
 
-  dialog --clear \
-    --form "Fill in client host details:" 25 60 16 \
-    "Host domain: " 1 1 "example.com" 1 32 25 30 \
-    "Support username: " 2 1 "$SUPPORT_USER" 2 32 25 30 \
-    "SSH port: " 3 1 "23242" 3 32 25 30 \
-    "Alert email (aliases): " 4 1 "alerts@example.com" 4 32 25 30 \
-    "Relayhost (empty=direct MX): " 5 1 "172.26.0.1" 5 32 25 30 \
-    --insecure --passwordbox "Password for support user (empty=keep/leave locked):" 8 60 >"$form_tmp" \
-    2>&1 >/dev/tty
+  # Cancel or invalid input goes back to the form (keeping typed values) instead of aborting
+  while true; do
+    if ! form_out=$(dialog --clear \
+      --form "Fill in client host details:" 16 60 5 \
+      "Host domain: " 1 1 "$form_domain" 1 32 25 30 \
+      "Support username: " 2 1 "$form_user" 2 32 25 30 \
+      "SSH port: " 3 1 "$form_port" 3 32 25 30 \
+      "Alert email (aliases): " 4 1 "$form_mail" 4 32 25 30 \
+      "Relayhost (empty=direct MX): " 5 1 "$form_relay" 5 32 25 30 \
+      2>&1 >/dev/tty); then
+      if (whiptail --title "Cancel" --yesno "Exit the installer?\n\nNO = back to the form" 10 60); then
+        install_abort "cancelled_form"
+      fi
+      continue
+    fi
 
-  tr -d '\r' <"$form_tmp" >"$form_clean"
-  # Do not drop empty lines: an empty relayhost must keep line 5
-  DOMINIO=$(sed -n '1p' "$form_clean" | tr -d ' \t')
-  SUPPORT_USER=$(sed -n '2p' "$form_clean" | tr -d ' \t')
-  SSH_PORT=$(sed -n '3p' "$form_clean" | tr -d ' \t')
-  CORREO=$(sed -n '4p' "$form_clean" | tr -d ' \t')
-  IPCORREO=$(sed -n '5p' "$form_clean" | tr -d ' \t')
-  USER_PASSWORD=$(sed -n '6p' "$form_clean" | tr -d ' \t')
-  # Secure wipe: do not persist password in /var/log or /tmp
-  shred -u "$form_tmp" "$form_clean" 2>/dev/null || rm -f "$form_tmp" "$form_clean"
+    form_out=$(tr -d '\r' <<<"$form_out")
+    # Do not drop empty lines: an empty relayhost must keep line 5
+    form_domain=$(sed -n '1p' <<<"$form_out" | tr -d ' \t')
+    form_user=$(sed -n '2p' <<<"$form_out" | tr -d ' \t')
+    form_port=$(sed -n '3p' <<<"$form_out" | tr -d ' \t')
+    form_mail=$(sed -n '4p' <<<"$form_out" | tr -d ' \t')
+    form_relay=$(sed -n '5p' <<<"$form_out" | tr -d ' \t')
 
-  # Validate support username (create-or-reuse target)
-  if [[ -z "$SUPPORT_USER" || "$SUPPORT_USER" == "root" ]]; then
-    whiptail --msgbox "Support username cannot be empty or 'root'." 8 50
-    install_abort "invalid_support_user"
-  fi
-  if [[ ! "$SUPPORT_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
-    whiptail --msgbox "Invalid support username: ${SUPPORT_USER}\nUse lowercase letters, digits, _ or -." 9 60
-    install_abort "invalid_support_user_format"
-  fi
+    if [[ ! "$form_domain" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ || "$form_domain" == "example.com" ]]; then
+      whiptail --msgbox "Invalid host domain: '${form_domain}'\nUse the real domain (e.g. frsf.utn.edu.ar)." 9 60
+      continue
+    fi
+    if [[ -z "$form_user" || "$form_user" == "root" ]]; then
+      whiptail --msgbox "Support username cannot be empty or 'root'." 8 50
+      continue
+    fi
+    if [[ ! "$form_user" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+      whiptail --msgbox "Invalid support username: ${form_user}\nUse lowercase letters, digits, _ or -." 9 60
+      continue
+    fi
+    if [[ ! "$form_port" =~ ^[0-9]+$ ]] || ((form_port < 1 || form_port > 65535)); then
+      whiptail --msgbox "Invalid SSH port: '${form_port}' (1-65535)." 8 50
+      continue
+    fi
+
+    DOMINIO="$form_domain"
+    SUPPORT_USER="$form_user"
+    SSH_PORT="$form_port"
+    CORREO="$form_mail"
+    IPCORREO="$form_relay"
+
+    prompt_support_password || continue
+    break
+  done
 
   FQDN="${HOST}.${DOMINIO}"
   MAIL_FROM="${HOST}@${DOMINIO}"

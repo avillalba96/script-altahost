@@ -44,6 +44,16 @@ In the main form you type the **support username** (e.g. `support`, `soportecc`,
 - **Does not exist** → created (`sudo`, home, shell, optional password/SSH key)
 - **Already exists** → reused; script only applies what is needed (`sudo`, password if you typed one, SSH key if provided). Empty password field leaves the existing password unchanged.
 
+The password is asked in its own prompt after the form, showing the username you typed (asked twice to avoid typos). Invalid form values or Cancel/Esc go back to the form instead of aborting.
+
+### SSH authentication (VMs)
+
+- **Password login: YES** → password kept; optionally paste an SSH public key.
+- **Password login: NO** → paste the full `.pub` content (one line). If it is empty/invalid you are asked to retry; answering **NO** to retry continues with password login (Ubuntu default) and a warning at the end — the install is never cancelled for a missing key.
+- `root` can never log in over SSH (`PermitRootLogin no`); use `sudo`.
+- `PasswordAuthentication` is also applied to `/etc/ssh/sshd_config.d/*.conf` (Ubuntu's `50-cloud-init.conf` would otherwise override it).
+- On Ubuntu with socket-activated SSH (`ssh.socket`), the new port is active after a reboot (or `systemctl daemon-reload && systemctl restart ssh.socket`).
+
 ### SSH countries
 
 During install a **whiptail prompt** asks for ISO country codes (e.g. `US,DE,AR`), pre-filled with `SSH_ALLOW_COUNTRIES`. That value is written into `/usr/local/sbin/ipfilter-whitelist.sh`. You can also edit that file later and/or change the default constant in the script.
@@ -51,8 +61,8 @@ During install a **whiptail prompt** asks for ISO country codes (e.g. `US,DE,AR`
 ## Main features
 
 - Baseline packages, SSH hardening helpers, MOTD banners, Postfix alerts
-- Creates or reuses the **support username** from the form (sudo + optional/required SSH key)
-- **VMs:** choose password SSH or key-only; custom SSH port; `PermitRootLogin no`
+- Creates or reuses the **support username** from the form (sudo + optional SSH key)
+- **VMs:** choose password SSH or key-only (falls back to password if no key); custom SSH port; `PermitRootLogin no`
 - **PVE/PBS:** official `sshd` defaults left alone; you can still attach a key to `SUPPORT_USER`
 - SSH country filter via **ipinfo** + tcp_wrappers
 - Fail2ban: PVE/PBS UI jails + `sshd` jail
